@@ -1,0 +1,118 @@
+.layout {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--parchment);
+}
+
+.loginBtn {
+  padding: var(--space-sm) var(--space-md);
+  background-color: var(--terracotta);
+  color: var(--ivory);
+  font-size: 0.9rem;
+  font-weight: 500;
+  border-radius: var(--radius-sm);
+  text-decoration: none;
+  transition: background-color 0.2s;
+}
+
+.loginBtn:hover {
+  background-color: var(--terracotta-dark);
+  color: var(--ivory);
+}
+
+.hero {
+  text-align: center;
+  padding: var(--space-3xl) var(--space-lg) var(--space-2xl);
+  background-color: var(--parchment);
+}
+
+.heroTitle {
+  font-family: var(--font-serif);
+  font-size: 4rem;
+  font-weight: 500;
+  color: var(--near-black);
+  line-height: 1.10;
+  margin-bottom: var(--space-lg);
+  letter-spacing: -0.01em;
+}
+
+.heroSubtitle {
+  font-family: var(--font-sans);
+  font-size: 1.25rem;
+  color: var(--olive-gray);
+  line-height: 1.60;
+  letter-spacing: 0.01em;
+}
+
+@media (max-width: 640px) {
+  .heroTitle {
+    font-size: 2.5rem;
+  }
+  .heroSubtitle {
+    font-size: 1rem;
+  }
+}
+
+.main {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: var(--space-xl) var(--space-lg);
+  width: 100%;
+  flex: 1;
+}
+
+.controls {
+  margin-bottom: var(--space-lg);
+}
+
+.controls > nav {
+  width: 100%;
+}
+
+.feed {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.postList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.loading,
+.empty {
+  text-align: center;
+  padding: var(--space-3xl);
+  color: var(--olive-gray);
+}
+
+.emptyHint {
+  font-size: 0.85rem;
+  margin-top: var(--space-sm);
+  color: var(--stone-gray);
+}
+
+.loadMore {
+  margin-top: var(--space-md);
+  padding: var(--space-sm) var(--space-lg);
+  background-color: var(--warm-sand);
+  color: var(--charcoal-warm);
+  font-size: 0.9rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background-color 0.2s;
+  align-self: center;
+}
+
+.loadMore:hover:not(:disabled) {
+  background-color: var(--warm-sand-dark);
+}
+
+.loadMore:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

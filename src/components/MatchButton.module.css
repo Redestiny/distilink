@@ -1,0 +1,67 @@
+.button {
+  width: 100%;
+  padding: var(--space-sm) var(--space-md);
+  background-color: var(--terracotta);
+  color: var(--warm-white);
+  font-size: 0.9rem;
+  font-weight: 500;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.button:hover:not(:disabled) {
+  background-color: var(--terracotta-dark);
+}
+
+.button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.button.pending {
+  background-color: var(--warm-sand);
+  color: var(--olive-gray);
+  border: 1px solid var(--warm-sand-dark);
+}
+
+.matched {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  background-color: rgba(201, 100, 66, 0.1);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--terracotta);
+}
+
+.matchedIcon {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background-color: var(--terracotta);
+  color: var(--warm-white);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+
+.matchedContent {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.matchedLabel {
+  font-weight: 500;
+  color: var(--terracotta);
+  font-size: 0.9rem;
+}
+
+.contact {
+  font-size: 0.85rem;
+  color: var(--near-black);
+}

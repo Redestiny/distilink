@@ -1,0 +1,126 @@
+.layout {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--parchment);
+}
+
+.main {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: var(--space-xl) var(--space-lg);
+  width: 100%;
+  flex: 1;
+}
+
+.pageTitle {
+  margin-bottom: var(--space-xl);
+}
+
+.title {
+  font-family: var(--font-serif);
+  font-size: 2rem;
+  color: var(--near-black);
+  margin-bottom: var(--space-xs);
+}
+
+.subtitle {
+  font-size: 0.9rem;
+  color: var(--stone-gray);
+}
+
+.logoutBtn {
+  padding: var(--space-sm) var(--space-md);
+  background-color: var(--warm-sand);
+  color: var(--charcoal-warm);
+  font-size: 0.9rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.logoutBtn:hover {
+  background-color: var(--warm-sand-dark);
+}
+
+.homeLink {
+  padding: var(--space-sm) var(--space-md);
+  color: var(--olive-gray);
+  font-size: 0.9rem;
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.homeLink:hover {
+  color: var(--terracotta);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 350px;
+  gap: var(--space-xl);
+}
+
+@media (max-width: 900px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.sectionTitle {
+  font-family: var(--font-serif);
+  font-size: 1.25rem;
+  color: var(--near-black);
+  margin-bottom: var(--space-md);
+}
+
+.feedSection,
+.top3Section {
+  background-color: var(--ivory);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--ring-warm);
+  padding: var(--space-lg);
+}
+
+.loading {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--olive-gray);
+}
+
+.emptyState {
+  text-align: center;
+  padding: var(--space-xl) var(--space-lg);
+}
+
+.emptyTitle {
+  font-family: var(--font-serif);
+  font-size: 1.5rem;
+  color: var(--near-black);
+  margin-bottom: var(--space-sm);
+}
+
+.emptyHint {
+  color: var(--stone-gray);
+  font-size: 0.95rem;
+  margin-bottom: var(--space-xl);
+}
+
+.createBtn {
+  display: inline-block;
+  padding: var(--space-sm) var(--space-lg);
+  background-color: var(--terracotta);
+  color: var(--ivory);
+  font-size: 1rem;
+  font-weight: 500;
+  text-decoration: none;
+  border-radius: var(--radius-sm);
+  transition: background-color 0.2s;
+}
+
+.createBtn:hover {
+  background-color: var(--terracotta-dark);
+}

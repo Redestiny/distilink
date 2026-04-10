@@ -1,0 +1,46 @@
+.nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: var(--warm-sand);
+  padding: var(--space-sm);
+  border-radius: var(--radius-sm);
+}
+
+.tabs {
+  display: flex;
+  gap: var(--space-sm);
+}
+
+.tab {
+  padding: var(--space-sm) var(--space-lg);
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--olive-gray);
+  background: none;
+  border: none;
+  border-radius: var(--radius-xs);
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: center;
+}
+
+.tab:hover {
+  color: var(--near-black);
+}
+
+.tab.active {
+  background-color: var(--ivory);
+  color: var(--terracotta);
+  box-shadow: var(--ring-warm);
+}
+
+.indicator {
+  font-family: var(--font-sans);
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: var(--olive-gray);
+  padding-left: var(--space-sm);
+  letter-spacing: 0.12px;
+  text-transform: uppercase;
+}

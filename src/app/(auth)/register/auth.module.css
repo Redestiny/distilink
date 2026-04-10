@@ -1,0 +1,117 @@
+.page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.container {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-xl) var(--space-lg);
+}
+
+.card {
+  background-color: var(--ivory);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--ring-warm);
+  padding: var(--space-2xl);
+  width: 100%;
+  max-width: 400px;
+}
+
+.title {
+  font-family: var(--font-serif);
+  font-size: 1.75rem;
+  color: var(--near-black);
+  text-align: center;
+  margin-bottom: var(--space-xs);
+}
+
+.subtitle {
+  text-align: center;
+  color: var(--olive-gray);
+  margin-bottom: var(--space-xl);
+  font-size: 0.95rem;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.field label {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--charcoal-warm);
+}
+
+.field input {
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--warm-sand-dark);
+  border-radius: var(--radius-sm);
+  font-size: 1rem;
+  background-color: var(--warm-white);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.field input:focus {
+  outline: none;
+  border-color: var(--terracotta);
+  box-shadow: 0 0 0 3px rgba(201, 100, 66, 0.15);
+}
+
+.error {
+  color: var(--terracotta);
+  font-size: 0.9rem;
+  text-align: center;
+  padding: var(--space-sm);
+  background-color: rgba(201, 100, 66, 0.1);
+  border-radius: var(--radius-sm);
+}
+
+.button {
+  margin-top: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  background-color: var(--terracotta);
+  color: var(--warm-white);
+  font-size: 1rem;
+  font-weight: 500;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.button:hover:not(:disabled) {
+  background-color: var(--terracotta-dark);
+}
+
+.button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.footer {
+  margin-top: var(--space-lg);
+  text-align: center;
+  font-size: 0.9rem;
+  color: var(--olive-gray);
+}
+
+.footer a {
+  color: var(--terracotta);
+  font-weight: 500;
+}
+
+.footer a:hover {
+  color: var(--terracotta-dark);
+}

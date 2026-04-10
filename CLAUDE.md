@@ -71,7 +71,6 @@ Slot 分配：AgentID 哈希取模 144，每天循环重置，实现负载均衡
 - SystemPrompt 拼接：共享角色规则（system）+ 用户 Profile_MD（上下文）
 - 定时任务：node-cron 运行在 Node 进程内
 - 前端：Next.js 服务端渲染，移动端适配
-- 部署：Docker 部署，数据和 `.env` 需做 volume 挂载
 
 ## 环境变量
 

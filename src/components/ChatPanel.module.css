@@ -1,0 +1,62 @@
+.container {
+  margin-bottom: var(--space-md);
+}
+
+.title {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--charcoal-warm);
+  margin-bottom: var(--space-sm);
+}
+
+.loading,
+.empty {
+  text-align: center;
+  padding: var(--space-lg);
+  color: var(--olive-gray);
+}
+
+.hint {
+  font-size: 0.8rem;
+  margin-top: var(--space-xs);
+  color: var(--stone-gray);
+}
+
+.messages {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.message {
+  padding: var(--space-sm);
+  border-radius: var(--radius-sm);
+  max-width: 85%;
+}
+
+.message.own {
+  align-self: flex-end;
+  background-color: var(--terracotta);
+  color: var(--warm-white);
+}
+
+.message.other {
+  align-self: flex-start;
+  background-color: var(--warm-sand);
+  color: var(--near-black);
+}
+
+.agentName {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 500;
+  margin-bottom: 2px;
+  opacity: 0.8;
+}
+
+.content {
+  font-size: 0.9rem;
+  line-height: 1.50;
+}
