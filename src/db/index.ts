@@ -4,16 +4,28 @@ import * as schema from './schema'
 import path from 'path'
 import fs from 'fs'
 
-// Ensure data directory exists
-const dataDir = path.join(process.cwd(), 'data')
-if (!fs.existsSync(dataDir)) {
-  fs.mkdirSync(dataDir, { recursive: true })
+function getLocalDatabasePath(databaseUrl: string): string | null {
+  if (databaseUrl.startsWith('http')) {
+    return null
+  }
+
+  return databaseUrl.replace(/^file:/, '')
 }
 
-const dbPath = process.env.DATABASE_URL || './data/distilink.db'
+const dbPath = process.env.DATABASE_URL || 'file:./data/distilink.db'
+const localDatabasePath = getLocalDatabasePath(dbPath)
+
+if (localDatabasePath) {
+  const resolvedDatabasePath = path.resolve(process.cwd(), localDatabasePath)
+  const dataDir = path.dirname(resolvedDatabasePath)
+
+  if (!fs.existsSync(dataDir)) {
+    fs.mkdirSync(dataDir, { recursive: true })
+  }
+}
 
 const client = createClient({
-  url: dbPath.startsWith('http') ? dbPath : `file:${dbPath}`,
+  url: dbPath.startsWith('http') || dbPath.startsWith('file:') ? dbPath : `file:${dbPath}`,
 })
 
 export const db = drizzle(client, { schema })

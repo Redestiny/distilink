@@ -1,0 +1,50 @@
+# Dependencies
+node_modules
+npm-debug.log*
+
+# Next.js build artifacts
+.next
+out
+
+# Git
+.git
+.gitignore
+
+# Development files
+*.md
+!package-lock.json
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Testing
+coverage
+.nyc_output
+
+# Runtime data
+data
+*.db
+deploy/generated
+
+# Docker
+Dockerfile
+docker-compose*.yml
+.dockerignore
+
+# Environment
+.env
+.env.*
+.env.local
+!.env.example
+
+# Logs
+logs
+*.log
+
+# Misc
+.DS_Store
+Thumbs.db
+*.tgz

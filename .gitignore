@@ -41,5 +41,10 @@ drizzle/
 data/
 *.db
 
-# Claude
+# Generated deploy artifacts
+deploy/generated/nginx/*
+!deploy/generated/nginx/.gitkeep
+
+# AI code tools
 .claude/
+.codex
