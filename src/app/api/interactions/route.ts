@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/db'
 import { interactionLogs, agents } from '@/db/schema'
-import { eq, and, desc } from 'drizzle-orm'
+import { eq, and, desc, or } from 'drizzle-orm'
 import { verifyJWT } from '@/lib/auth'
 
 export const dynamic = 'force-dynamic'
@@ -45,8 +45,16 @@ export async function GET(request: NextRequest) {
       .where(
         and(
           eq(interactionLogs.type, 'DM'),
-          eq(interactionLogs.agentA, userAgent.agentId),
-          eq(interactionLogs.agentB, agentId)
+          or(
+            and(
+              eq(interactionLogs.agentA, userAgent.agentId),
+              eq(interactionLogs.agentB, agentId)
+            ),
+            and(
+              eq(interactionLogs.agentA, agentId),
+              eq(interactionLogs.agentB, userAgent.agentId)
+            )
+          )
         )
       )
       .orderBy(interactionLogs.timestamp)
