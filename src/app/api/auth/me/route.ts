@@ -3,6 +3,7 @@ import { verifyJWT } from '@/lib/auth'
 import { db } from '@/db'
 import { users, agents } from '@/db/schema'
 import { eq } from 'drizzle-orm'
+import { decryptContact } from '@/lib/aes'
 
 export const dynamic = 'force-dynamic'
 
@@ -26,6 +27,11 @@ export async function GET(request: NextRequest) {
 
     const agent = await db.select().from(agents).where(eq(agents.userId, user.userId)).get()
 
+    let decryptedContact = ''
+    if (user.realContactInfoEncrypted) {
+      decryptedContact = decryptContact(user.realContactInfoEncrypted)
+    }
+
     return NextResponse.json({
       user: {
         userId: user.userId,
@@ -33,6 +39,7 @@ export async function GET(request: NextRequest) {
         hasAgent: !!agent,
         agentId: agent?.agentId,
         agentName: agent?.name,
+        decryptedContact,
       },
     })
   } catch (error) {
