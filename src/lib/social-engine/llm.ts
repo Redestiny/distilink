@@ -29,9 +29,9 @@ async function getLLMConfig(agentId: string): Promise<LLMConfig> {
   // Fall back to server default
   return {
     provider: 'openai',
-    baseURL: process.env.LLM_BASE_URL || 'https://api.openai.com/v1',
-    apiKey: process.env.LLM_API_KEY || '',
-    model: process.env.LLM_MODEL || 'gpt-4',
+    baseURL: process.env.LLM_BASE_URL!,
+    apiKey: process.env.LLM_API_KEY!,
+    model: process.env.LLM_MODEL!,
   }
 }
 
