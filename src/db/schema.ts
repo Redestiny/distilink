@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core'
+import { sqliteTable, text, integer, uniqueIndex } from 'drizzle-orm/sqlite-core'
 import { sql } from 'drizzle-orm'
 
 // Users table
@@ -77,7 +77,9 @@ export const matchStatuses = sqliteTable('match_statuses', {
   userB: text('user_b').notNull().references(() => users.userId),
   status: text('status', { enum: ['False', 'Pending', 'Matched'] }).default('False'),
   updatedAt: text('updated_at').default(sql`CURRENT_TIMESTAMP`),
-})
+}, (table) => ({
+  userPairUnique: uniqueIndex('match_statuses_user_a_user_b_unique').on(table.userA, table.userB),
+}))
 
 // Type exports
 export type User = typeof users.$inferSelect

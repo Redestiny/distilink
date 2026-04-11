@@ -65,3 +65,15 @@
   font-size: 0.85rem;
   color: var(--near-black);
 }
+
+.wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.error {
+  font-size: 0.8rem;
+  color: var(--terracotta);
+  text-align: center;
+}

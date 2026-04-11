@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/db'
 import { matchStatuses, agents, users } from '@/db/schema'
-import { eq, and, or } from 'drizzle-orm'
+import { eq, and } from 'drizzle-orm'
 import { verifyJWT } from '@/lib/auth'
 import { decryptContact } from '@/lib/aes'
 
@@ -32,6 +32,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: '目标Agent不存在' }, { status: 404 })
     }
 
+    if (targetAgent.userId === payload.userId) {
+      return NextResponse.json({ error: '不能查看自己的 Agent 匹配状态' }, { status: 400 })
+    }
+
     // Check match status in both directions
     const matchAB = await db
       .select()
@@ -60,19 +64,21 @@ export async function GET(request: NextRequest) {
 
     if (matchAB?.status === 'Matched' || matchBA?.status === 'Matched') {
       status = 'Matched'
-      // Get the other user's contact
-      const otherUserId = matchAB?.status === 'Matched' ? targetAgent.userId : payload.userId
-      const otherUser = await db.select().from(users).where(eq(users.userId, otherUserId)).get()
-      if (otherUser?.realContactInfoEncrypted) {
-        matchedContact = decryptContact(otherUser.realContactInfoEncrypted)
+      const targetUser = await db
+        .select({ realContactInfoEncrypted: users.realContactInfoEncrypted })
+        .from(users)
+        .where(eq(users.userId, targetAgent.userId))
+        .get()
+
+      if (targetUser?.realContactInfoEncrypted) {
+        matchedContact = decryptContact(targetUser.realContactInfoEncrypted)
       }
-    } else if (matchAB?.status === 'Pending' || matchBA?.status === 'Pending') {
+    } else if (matchAB?.status === 'Pending') {
       status = 'Pending'
     }
 
     return NextResponse.json({
       status,
-      myRequest: matchAB?.status === 'Pending' ? 'Pending' : null,
       matchedContact,
     })
   } catch (error) {

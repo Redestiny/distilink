@@ -1,44 +1,80 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import styles from './MatchButton.module.css'
 
+type MatchButtonStatus = 'None' | 'Pending' | 'Matched'
+
+interface MatchResponse {
+  status: MatchButtonStatus
+  matchedContact?: string | null
+  error?: string
+}
+
 export default function MatchButton({ targetAgentId }: { targetAgentId: string }) {
-  const [status, setStatus] = useState<'None' | 'Pending' | 'Matched'>('None')
+  const [status, setStatus] = useState<MatchButtonStatus>('None')
   const [matchedContact, setMatchedContact] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [initLoading, setInitLoading] = useState(true)
+  const [actionLoading, setActionLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const requestLockRef = useRef(false)
 
   useEffect(() => {
+    requestLockRef.current = false
+    setInitLoading(true)
+    setError(null)
+    setStatus('None')
+    setMatchedContact(null)
+
     fetch(`/api/match/status?targetAgentId=${targetAgentId}`)
-      .then((res) => res.json())
+      .then(async (res) => {
+        const data = await res.json() as MatchResponse
+        if (!res.ok) {
+          throw new Error(data.error || '加载状态失败')
+        }
+
+        return data
+      })
       .then((data) => {
         setStatus(data.status)
-        setMatchedContact(data.matchedContact)
+        setMatchedContact(data.matchedContact ?? null)
       })
-      .catch(console.error)
-      .finally(() => setLoading(false))
+      .catch((loadError: Error) => {
+        console.error(loadError)
+        setError(loadError.message || '加载状态失败')
+      })
+      .finally(() => setInitLoading(false))
   }, [targetAgentId])
 
   const handleClick = async () => {
-    if (status === 'Matched') return
+    if (status !== 'None' || actionLoading || requestLockRef.current) return
 
-    setLoading(true)
+    requestLockRef.current = true
+    setActionLoading(true)
+    setError(null)
     try {
       const res = await fetch('/api/match/request', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ targetAgentId }),
       })
-      const data = await res.json()
+      const data = await res.json() as MatchResponse
+      if (!res.ok) {
+        setError(data.error || '请求失败')
+        return
+      }
+
       setStatus(data.status)
-    } catch (error) {
-      console.error('Match request error:', error)
+      setMatchedContact(data.matchedContact ?? null)
+    } catch {
+      setError('网络错误')
     } finally {
-      setLoading(false)
+      requestLockRef.current = false
+      setActionLoading(false)
     }
   }
 
-  if (loading) {
+  if (initLoading) {
     return <button className={styles.button} disabled>加载中...</button>
   }
 
@@ -54,13 +90,19 @@ export default function MatchButton({ targetAgentId }: { targetAgentId: string }
     )
   }
 
+  const isPending = status === 'Pending' || actionLoading
+  const isDisabled = status !== 'None' || actionLoading
+
   return (
-    <button
-      className={`${styles.button} ${status === 'Pending' ? styles.pending : ''}`}
-      onClick={handleClick}
-      disabled={loading}
-    >
-      {status === 'Pending' ? '请求中...' : '请求交换联系方式'}
-    </button>
+    <div className={styles.wrapper}>
+      <button
+        className={`${styles.button} ${isPending ? styles.pending : ''}`}
+        onClick={handleClick}
+        disabled={isDisabled}
+      >
+        {isPending ? '请求中...' : '请求交换联系方式'}
+      </button>
+      {error && <span className={styles.error}>{error}</span>}
+    </div>
   )
 }

@@ -63,7 +63,14 @@ function loadMigrations() {
         statements: sql
           .split('--> statement-breakpoint')
           .map((statement) => statement.trim())
-          .filter(Boolean),
+          .filter((statement) => {
+            if (!statement) {
+              return false
+            }
+
+            const executableSql = statement.replace(/\/\*[\s\S]*?\*\//g, '').trim()
+            return executableSql.length > 0
+          }),
       }
     })
 }
@@ -95,6 +102,63 @@ async function columnExists(client, tableName, columnName) {
   return result.rows.some((row) => row.name === columnName)
 }
 
+async function deduplicateMatchStatuses(client) {
+  if (!(await tableExists(client, 'match_statuses'))) {
+    return
+  }
+
+  const duplicateGroups = await execute(
+    client,
+    `SELECT COUNT(*) AS count
+     FROM (
+       SELECT 1
+       FROM match_statuses
+       GROUP BY user_a, user_b
+       HAVING COUNT(*) > 1
+     )`
+  )
+
+  const duplicateGroupCount = Number(duplicateGroups.rows[0]?.count ?? 0)
+  if (duplicateGroupCount > 0) {
+    console.log(`[DB] Deduplicating ${duplicateGroupCount} duplicate match_statuses pair(s)`)
+  }
+
+  await client.execute(`
+    DELETE FROM match_statuses
+    WHERE rowid IN (
+      SELECT rowid
+      FROM (
+        SELECT
+          rowid,
+          ROW_NUMBER() OVER (
+            PARTITION BY user_a, user_b
+            ORDER BY
+              CASE status
+                WHEN 'Matched' THEN 2
+                WHEN 'Pending' THEN 1
+                ELSE 0
+              END DESC,
+              COALESCE(datetime(updated_at), updated_at) DESC,
+              rowid DESC
+          ) AS row_number
+        FROM match_statuses
+      ) ranked
+      WHERE row_number > 1
+    )
+  `)
+}
+
+async function ensureMatchStatusesUniqueIndex(client) {
+  if (!(await tableExists(client, 'match_statuses'))) {
+    return
+  }
+
+  await deduplicateMatchStatuses(client)
+  await client.execute(
+    'CREATE UNIQUE INDEX IF NOT EXISTS match_statuses_user_a_user_b_unique ON match_statuses (user_a, user_b)'
+  )
+}
+
 async function ensureCompatibility(client) {
   if (await tableExists(client, 'users')) {
     await client.execute('CREATE UNIQUE INDEX IF NOT EXISTS users_email_unique ON users (email)')
@@ -104,6 +168,8 @@ async function ensureCompatibility(client) {
     console.log('[DB] Adding missing comments.parent_id column')
     await client.execute('ALTER TABLE comments ADD COLUMN parent_id text')
   }
+
+  await ensureMatchStatusesUniqueIndex(client)
 }
 
 async function ensureMigrationsTable(client) {
@@ -149,15 +215,18 @@ async function getExistingAppTableCount(client) {
 }
 
 async function markLegacySchemaAsApplied(client, migrations) {
-  console.log(`[DB] Existing schema detected. Recording ${migrations.length} baseline migration(s).`)
-
-  for (const migration of migrations) {
-    await execute(
-      client,
-      `INSERT INTO ${quoteIdentifier(MIGRATIONS_TABLE)} (hash, created_at) VALUES (?, ?)`,
-      [migration.hash, migration.when]
-    )
+  const baselineMigration = migrations[0]
+  if (!baselineMigration) {
+    return
   }
+
+  console.log(`[DB] Existing schema detected. Recording baseline migration ${baselineMigration.tag}.`)
+
+  await execute(
+    client,
+    `INSERT INTO ${quoteIdentifier(MIGRATIONS_TABLE)} (hash, created_at) VALUES (?, ?)`,
+    [baselineMigration.hash, baselineMigration.when]
+  )
 }
 
 async function applyMigration(client, migration) {

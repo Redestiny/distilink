@@ -1,10 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/db'
-import { matchStatuses, agents } from '@/db/schema'
+import { matchStatuses, agents, users } from '@/db/schema'
 import { eq, and } from 'drizzle-orm'
 import { verifyJWT } from '@/lib/auth'
+import { decryptContact } from '@/lib/aes'
 
 export const dynamic = 'force-dynamic'
+
+async function getMatchedContact(targetUserId: string) {
+  const targetUser = await db
+    .select({ realContactInfoEncrypted: users.realContactInfoEncrypted })
+    .from(users)
+    .where(eq(users.userId, targetUserId))
+    .get()
+
+  if (!targetUser?.realContactInfoEncrypted) {
+    return null
+  }
+
+  return decryptContact(targetUser.realContactInfoEncrypted)
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -30,25 +45,83 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '目标Agent不存在' }, { status: 404 })
     }
 
-    // Get or create match status
-    const existing = await db
-      .select()
-      .from(matchStatuses)
-      .where(
-        and(
-          eq(matchStatuses.userA, payload.userId),
-          eq(matchStatuses.userB, targetAgent.userId)
+    if (targetAgent.userId === payload.userId) {
+      return NextResponse.json({ error: '不能请求自己的 Agent' }, { status: 400 })
+    }
+
+    const getPairStatuses = async () => Promise.all([
+      db
+        .select()
+        .from(matchStatuses)
+        .where(
+          and(
+            eq(matchStatuses.userA, payload.userId),
+            eq(matchStatuses.userB, targetAgent.userId)
+          )
         )
-      )
-      .get()
+        .get(),
+      db
+        .select()
+        .from(matchStatuses)
+        .where(
+          and(
+            eq(matchStatuses.userA, targetAgent.userId),
+            eq(matchStatuses.userB, payload.userId)
+          )
+        )
+        .get(),
+    ])
+
+    const promoteToMatched = async () => {
+      const updatedAt = new Date().toISOString()
+
+      await db.transaction(async (tx) => {
+        await tx.insert(matchStatuses).values({
+          userA: payload.userId,
+          userB: targetAgent.userId,
+          status: 'Matched',
+          updatedAt,
+        }).onConflictDoUpdate({
+          target: [matchStatuses.userA, matchStatuses.userB],
+          set: { status: 'Matched', updatedAt },
+        }).run()
+
+        await tx.insert(matchStatuses).values({
+          userA: targetAgent.userId,
+          userB: payload.userId,
+          status: 'Matched',
+          updatedAt,
+        }).onConflictDoUpdate({
+          target: [matchStatuses.userA, matchStatuses.userB],
+          set: { status: 'Matched', updatedAt },
+        }).run()
+      })
+
+      return NextResponse.json({
+        status: 'Matched',
+        matchedContact: await getMatchedContact(targetAgent.userId),
+      })
+    }
+
+    const [existing, reverse] = await getPairStatuses()
+
+    if (existing?.status === 'Matched' || reverse?.status === 'Matched') {
+      return promoteToMatched()
+    }
+
+    if (existing?.status === 'Pending' && reverse?.status === 'Pending') {
+      return promoteToMatched()
+    }
+
+    if (existing?.status === 'Pending') {
+      return NextResponse.json({ status: 'Pending' })
+    }
+
+    const updatedAt = new Date().toISOString()
 
     if (existing) {
-      if (existing.status === 'Matched') {
-        return NextResponse.json({ error: '已经匹配成功' }, { status: 400 })
-      }
-      // Toggle back to False
       await db.update(matchStatuses)
-        .set({ status: 'False' })
+        .set({ status: 'Pending', updatedAt })
         .where(
           and(
             eq(matchStatuses.userA, payload.userId),
@@ -56,16 +129,23 @@ export async function POST(request: NextRequest) {
           )
         )
         .run()
-
-      return NextResponse.json({ status: 'False' })
+    } else {
+      await db.insert(matchStatuses).values({
+        userA: payload.userId,
+        userB: targetAgent.userId,
+        status: 'Pending',
+        updatedAt,
+      }).onConflictDoUpdate({
+        target: [matchStatuses.userA, matchStatuses.userB],
+        set: { status: 'Pending', updatedAt },
+      }).run()
     }
 
-    // Create new pending request
-    await db.insert(matchStatuses).values({
-      userA: payload.userId,
-      userB: targetAgent.userId,
-      status: 'Pending',
-    }).run()
+    const [, refreshedReverse] = await getPairStatuses()
+
+    if (refreshedReverse?.status === 'Pending' || refreshedReverse?.status === 'Matched') {
+      return promoteToMatched()
+    }
 
     return NextResponse.json({ status: 'Pending' })
   } catch (error) {
