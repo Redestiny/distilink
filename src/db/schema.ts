@@ -10,7 +10,7 @@ export const users = sqliteTable('users', {
   emailVerified: integer('email_verified', { mode: 'boolean' }).default(false),
   verificationCode: text('verification_code'),
   codeExpiry: integer('code_expiry', { mode: 'timestamp' }),
-  createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`CURRENT_TIMESTAMP`),
+  createdAt: text('created_at').default(sql`CURRENT_TIMESTAMP`),
 })
 
 // Agents table
@@ -20,7 +20,7 @@ export const agents = sqliteTable('agents', {
   name: text('name').notNull(),
   profileMD: text('profile_md').notNull(),
   slot: integer('slot').notNull(), // 0-143 for load balancing
-  createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`CURRENT_TIMESTAMP`),
+  createdAt: text('created_at').default(sql`CURRENT_TIMESTAMP`),
 })
 
 // LLM Configs table
@@ -40,7 +40,7 @@ export const posts = sqliteTable('posts', {
   agentId: text('agent_id').notNull().references(() => agents.agentId),
   content: text('content').notNull(),
   topic: text('topic'),
-  createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`CURRENT_TIMESTAMP`),
+  createdAt: text('created_at').default(sql`CURRENT_TIMESTAMP`),
 })
 
 // Comments table
@@ -50,7 +50,7 @@ export const comments = sqliteTable('comments', {
   parentId: text('parent_id'), // null for top-level, set for replies
   agentId: text('agent_id').notNull().references(() => agents.agentId),
   content: text('content').notNull(),
-  createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`CURRENT_TIMESTAMP`),
+  createdAt: text('created_at').default(sql`CURRENT_TIMESTAMP`),
 })
 
 // Interaction Logs table
@@ -60,7 +60,7 @@ export const interactionLogs = sqliteTable('interaction_logs', {
   agentA: text('agent_a').notNull().references(() => agents.agentId),
   agentB: text('agent_b'), // null for Post, set for DM
   content: text('content').notNull(),
-  timestamp: integer('timestamp', { mode: 'timestamp' }).default(sql`CURRENT_TIMESTAMP`),
+  timestamp: text('timestamp').default(sql`CURRENT_TIMESTAMP`),
 })
 
 // Relationship Scores table (for Top 3 calculation)
@@ -68,7 +68,7 @@ export const relationshipScores = sqliteTable('relationship_scores', {
   agentA: text('agent_a').notNull().references(() => agents.agentId),
   agentB: text('agent_b').notNull().references(() => agents.agentId),
   score: integer('score').default(0),
-  updatedAt: integer('updated_at', { mode: 'timestamp' }).default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: text('updated_at').default(sql`CURRENT_TIMESTAMP`),
 })
 
 // Match Statuses table
@@ -76,7 +76,7 @@ export const matchStatuses = sqliteTable('match_statuses', {
   userA: text('user_a').notNull().references(() => users.userId),
   userB: text('user_b').notNull().references(() => users.userId),
   status: text('status', { enum: ['False', 'Pending', 'Matched'] }).default('False'),
-  updatedAt: integer('updated_at', { mode: 'timestamp' }).default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: text('updated_at').default(sql`CURRENT_TIMESTAMP`),
 })
 
 // Type exports

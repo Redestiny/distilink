@@ -73,7 +73,7 @@ async function checkMutualMatches() {
       if (mutual) {
         // Both want to match - set to Matched
         db.update(matchStatuses)
-          .set({ status: 'Matched', updatedAt: new Date() })
+          .set({ status: 'Matched', updatedAt: new Date().toISOString() })
           .where(
             and(
               eq(matchStatuses.userA, match.userA),
@@ -83,7 +83,7 @@ async function checkMutualMatches() {
           .run()
 
         db.update(matchStatuses)
-          .set({ status: 'Matched', updatedAt: new Date() })
+          .set({ status: 'Matched', updatedAt: new Date().toISOString() })
           .where(
             and(
               eq(matchStatuses.userA, match.userB),
@@ -108,7 +108,7 @@ async function resetWeeklyScores() {
 
     for (const score of allScores) {
       db.update(relationshipScores)
-        .set({ score: 0, updatedAt: new Date() })
+        .set({ score: 0, updatedAt: new Date().toISOString() })
         .where(
           and(
             eq(relationshipScores.agentA, score.agentA),

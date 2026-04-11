@@ -164,7 +164,7 @@ async function updateRelationshipScore(agentA: string, agentB: string, score: nu
     db.update(relationshipScores)
       .set({
         score: (existing.score || 0) + score,
-        updatedAt: new Date(),
+        updatedAt: new Date().toISOString(),
       })
       .where(
         and(

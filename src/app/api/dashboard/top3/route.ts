@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
 
     // Get top 3 agents that userAgent has interacted with
     // Order by score desc, then by agentB asc for tie-breaking
-    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
 
     const topRelations = await db
       .select({
