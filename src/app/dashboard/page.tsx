@@ -20,6 +20,18 @@ export default function DashboardPage() {
   const [resetLoading, setResetLoading] = useState(false)
   const [decryptedContact, setDecryptedContact] = useState('')
 
+  // LLM Config state
+  const [showLLMModal, setShowLLMModal] = useState(false)
+  const [llmConfigs, setLlmConfigs] = useState<any[]>([])
+  const [llmForm, setLlmForm] = useState({
+    provider: 'openai',
+    baseURL: '',
+    apiKey: '',
+    model: '',
+  })
+  const [llmLoading, setLlmLoading] = useState(false)
+  const [llmError, setLlmError] = useState('')
+
   useEffect(() => {
     let isMounted = true
 
@@ -48,6 +60,63 @@ export default function DashboardPage() {
   const handleLogout = async () => {
     await fetch('/api/auth/logout', { method: 'POST' })
     router.push('/')
+  }
+
+  const openLLMModal = async () => {
+    try {
+      const res = await fetch('/api/config/llm')
+      const data = await res.json()
+      setLlmConfigs(data.configs || [])
+      setLlmForm({ provider: 'openai', baseURL: '', apiKey: '', model: '' })
+      setShowLLMModal(true)
+      setLlmError('')
+    } catch {
+      setLlmError('加载配置失败')
+    }
+  }
+
+  const handleLLMSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setLlmError('')
+    setLlmLoading(true)
+
+    try {
+      const res = await fetch('/api/config/llm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(llmForm),
+      })
+      const data = await res.json()
+
+      if (!res.ok) {
+        setLlmError(data.error || '保存失败')
+        return
+      }
+
+      // Reload configs
+      const listRes = await fetch('/api/config/llm')
+      const listData = await listRes.json()
+      setLlmConfigs(listData.configs || [])
+      setLlmForm({ provider: 'openai', baseURL: '', apiKey: '', model: '' })
+    } catch {
+      setLlmError('网络错误')
+    } finally {
+      setLlmLoading(false)
+    }
+  }
+
+  const handleLLMDelete = async (configId: string) => {
+    try {
+      const res = await fetch(`/api/config/llm?configId=${configId}`, { method: 'DELETE' })
+      if (!res.ok) {
+        const data = await res.json()
+        setLlmError(data.error || '删除失败')
+        return
+      }
+      setLlmConfigs(llmConfigs.filter((c) => c.configId !== configId))
+    } catch {
+      setLlmError('删除失败')
+    }
   }
 
   const openResetModal = async () => {
@@ -165,9 +234,14 @@ export default function DashboardPage() {
               <h1 className={styles.title}>我的看板</h1>
               <p className={styles.subtitle}>Agent: {user?.agentName}</p>
             </div>
-            <button onClick={openResetModal} className={styles.updateBtn}>
-              更新 Agent
-            </button>
+            <div className={styles.buttonGroup}>
+              <button onClick={openResetModal} className={styles.updateBtn}>
+                更新 Agent
+              </button>
+              <button onClick={openLLMModal} className={styles.configBtn}>
+                配置 LLM
+              </button>
+            </div>
           </div>
         </div>
         <div className={styles.grid}>
@@ -255,6 +329,111 @@ export default function DashboardPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {showLLMModal && (
+        <div className={styles.modalOverlay} onClick={() => setShowLLMModal(false)}>
+          <div className={styles.modalCard} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.modalHeader}>
+              <h2 className={styles.modalTitle}>配置 LLM</h2>
+              <button onClick={() => setShowLLMModal(false)} className={styles.modalClose}>
+                ×
+              </button>
+            </div>
+            <form onSubmit={handleLLMSubmit} className={styles.modalForm}>
+              <div className={styles.field}>
+                <label htmlFor="llmProvider">Provider</label>
+                <select
+                  id="llmProvider"
+                  value={llmForm.provider}
+                  onChange={(e) => setLlmForm({ ...llmForm, provider: e.target.value })}
+                  className={styles.select}
+                >
+                  <option value="openai">OpenAI</option>
+                  <option value="anthropic">Anthropic</option>
+                  <option value="custom">Custom</option>
+                </select>
+              </div>
+
+              <div className={styles.field}>
+                <label htmlFor="llmBaseURL">Base URL</label>
+                <input
+                  id="llmBaseURL"
+                  type="text"
+                  value={llmForm.baseURL}
+                  onChange={(e) => setLlmForm({ ...llmForm, baseURL: e.target.value })}
+                  placeholder="https://api.openai.com/v1"
+                  required
+                />
+              </div>
+
+              <div className={styles.field}>
+                <label htmlFor="llmApiKey">API Key</label>
+                <input
+                  id="llmApiKey"
+                  type="password"
+                  value={llmForm.apiKey}
+                  onChange={(e) => setLlmForm({ ...llmForm, apiKey: e.target.value })}
+                  placeholder="sk-..."
+                  required
+                />
+              </div>
+
+              <div className={styles.field}>
+                <label htmlFor="llmModel">Model</label>
+                <input
+                  id="llmModel"
+                  type="text"
+                  value={llmForm.model}
+                  onChange={(e) => setLlmForm({ ...llmForm, model: e.target.value })}
+                  placeholder="gpt-4"
+                  required
+                />
+              </div>
+
+              {llmError && <div className={styles.error}>{llmError}</div>}
+
+              <div className={styles.modalActions}>
+                <button
+                  type="button"
+                  onClick={() => setShowLLMModal(false)}
+                  className={styles.cancelBtn}
+                  disabled={llmLoading}
+                >
+                  取消
+                </button>
+                <button
+                  type="submit"
+                  className={styles.submitBtn}
+                  disabled={llmLoading || !llmForm.baseURL || !llmForm.apiKey || !llmForm.model}
+                >
+                  {llmLoading ? '保存中...' : '保存'}
+                </button>
+              </div>
+            </form>
+
+            {llmConfigs.length > 0 && (
+              <div className={styles.llmConfigList}>
+                <h3 className={styles.llmConfigTitle}>已有配置</h3>
+                {llmConfigs.map((config) => (
+                  <div key={config.configId} className={styles.configItem}>
+                    <div className={styles.configInfo}>
+                      <span className={styles.configProvider}>{config.provider}</span>
+                      <span className={styles.configModel}>{config.model}</span>
+                      <span className={styles.configBaseURL}>{config.baseURL}</span>
+                    </div>
+                    <button
+                      onClick={() => handleLLMDelete(config.configId)}
+                      className={styles.deleteConfigBtn}
+                    >
+                      删除
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}

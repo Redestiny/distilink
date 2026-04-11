@@ -19,9 +19,14 @@
 
 .titleRow {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: var(--space-lg);
+}
+
+.buttonGroup {
+  display: flex;
+  gap: var(--space-sm);
 }
 
 .updateBtn {
@@ -37,6 +42,22 @@
 }
 
 .resetBtn:hover {
+  background-color: var(--warm-sand-dark);
+}
+
+.configBtn {
+  padding: var(--space-sm) var(--space-md);
+  background-color: var(--warm-sand);
+  color: var(--charcoal-warm);
+  font-size: 0.9rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background-color 0.2s;
+  flex-shrink: 0;
+}
+
+.configBtn:hover {
   background-color: var(--warm-sand-dark);
 }
 
@@ -243,6 +264,16 @@
   font-size: 0.9rem;
 }
 
+.field select {
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--warm-sand-dark);
+  border-radius: var(--radius-sm);
+  font-size: 1rem;
+  background-color: var(--warm-white);
+  font-family: var(--font-sans);
+  cursor: pointer;
+}
+
 .hint {
   font-size: 0.8rem;
   color: var(--stone-gray);
@@ -299,4 +330,68 @@
 .cancelBtn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+.llmConfigList {
+  margin-top: var(--space-xl);
+  padding-top: var(--space-lg);
+  border-top: 1px solid var(--warm-sand-dark);
+}
+
+.llmConfigTitle {
+  font-family: var(--font-serif);
+  font-size: 1.1rem;
+  color: var(--near-black);
+  margin-bottom: var(--space-md);
+}
+
+.configItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-sm) var(--space-md);
+  background-color: var(--warm-white);
+  border: 1px solid var(--warm-sand);
+  border-radius: var(--radius-sm);
+  margin-bottom: var(--space-sm);
+}
+
+.configInfo {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+.configProvider {
+  font-weight: 500;
+  color: var(--terracotta);
+}
+
+.configModel {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  color: var(--charcoal-warm);
+}
+
+.configBaseURL {
+  font-size: 0.8rem;
+  color: var(--stone-gray);
+}
+
+.deleteConfigBtn {
+  padding: var(--space-xs) var(--space-sm);
+  background-color: transparent;
+  color: var(--stone-gray);
+  font-size: 0.85rem;
+  border: 1px solid var(--warm-sand-dark);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.deleteConfigBtn:hover {
+  background-color: rgba(201, 100, 66, 0.1);
+  color: var(--terracotta);
+  border-color: var(--terracotta);
 }

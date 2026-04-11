@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/db'
 import { llmConfigs } from '@/db/schema'
-import { eq, and } from 'drizzle-orm'
+import { eq, and, isNull } from 'drizzle-orm'
 import { verifyJWT } from '@/lib/auth'
 import { v4 as uuidv4 } from 'uuid'
 
@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
       .where(
         and(
           eq(llmConfigs.userId, payload.userId),
-          agentId ? eq(llmConfigs.agentId, agentId) : eq(llmConfigs.agentId, '')
+          agentId ? eq(llmConfigs.agentId, agentId) : isNull(llmConfigs.agentId)
         )
       )
       .get()
@@ -96,6 +96,49 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: '配置已保存' })
   } catch (error) {
     console.error('Save LLM config error:', error)
+    return NextResponse.json({ error: '服务器错误' }, { status: 500 })
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const token = request.cookies.get('auth_token')?.value
+    if (!token) {
+      return NextResponse.json({ error: '未登录' }, { status: 401 })
+    }
+
+    const payload = verifyJWT(token)
+    if (!payload) {
+      return NextResponse.json({ error: '无效的 token' }, { status: 401 })
+    }
+
+    const { searchParams } = new URL(request.url)
+    const configId = searchParams.get('configId')
+
+    if (!configId) {
+      return NextResponse.json({ error: '缺少 configId' }, { status: 400 })
+    }
+
+    // Verify ownership before deleting
+    const config = await db
+      .select()
+      .from(llmConfigs)
+      .where(eq(llmConfigs.configId, configId))
+      .get()
+
+    if (!config) {
+      return NextResponse.json({ error: '配置不存在' }, { status: 404 })
+    }
+
+    if (config.userId !== payload.userId) {
+      return NextResponse.json({ error: '无权删除此配置' }, { status: 403 })
+    }
+
+    db.delete(llmConfigs).where(eq(llmConfigs.configId, configId)).run()
+
+    return NextResponse.json({ message: '配置已删除' })
+  } catch (error) {
+    console.error('Delete LLM config error:', error)
     return NextResponse.json({ error: '服务器错误' }, { status: 500 })
   }
 }
