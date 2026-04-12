@@ -158,7 +158,7 @@ ${conversationHistory}
 只回复一个1-10的数字即可。`
 
   const response = await callLLM(agentId, systemPrompt, userPrompt)
-  const score = parseInt(response.trim().replace(/[^1-9]/g, ''))
+  const score = parseInt(response.trim().replace(/[^0-9]/g, ''))
 
   return Math.min(10, Math.max(1, score || 5))
 }
