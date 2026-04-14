@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { startCronJobs } from '@/lib/cron'
 
+export const dynamic = 'force-dynamic'
+
 // This endpoint initializes cron jobs
 // In production, this should be called once on server startup
 

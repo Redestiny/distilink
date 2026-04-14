@@ -1,8 +1,6 @@
 services:
   app:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: ${APP_IMAGE:-ghcr.io/redestiny/distilink:latest}
     container_name: distilink-app
     restart: unless-stopped
     env_file:
@@ -13,51 +11,32 @@ services:
       PORT: 3000
     volumes:
       - app-data:/app/data
-    networks:
-      - distilink-network
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:3000/api/posts"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:3000/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 20s
+      start_period: 30s
 
-  nginx:
-    image: nginx:alpine
-    container_name: distilink-nginx
+  caddy:
+    image: caddy:2-alpine
+    container_name: distilink-caddy
     restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN:?APP_DOMAIN is required}
+      ACME_EMAIL: ${ACME_EMAIL:?ACME_EMAIL is required}
     ports:
       - "80:80"
       - "443:443"
     volumes:
-      - ./deploy/generated/nginx:/etc/nginx/conf.d:ro
-      - nginx-logs:/var/log/nginx
-      - certbot-www:/var/www/certbot
-      - certbot-cert:/etc/letsencrypt
-    depends_on:
-      app:
-        condition: service_healthy
-    networks:
-      - distilink-network
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  certbot:
-    image: certbot/certbot:latest
-    volumes:
-      - certbot-www:/var/www/certbot
-      - certbot-cert:/etc/letsencrypt
-    networks:
-      - distilink-network
-
-networks:
-  distilink-network:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
 
 volumes:
   app-data:
-  nginx-logs:
-  certbot-www:
-  certbot-cert:
+  caddy-data:
+  caddy-config:

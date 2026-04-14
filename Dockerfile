@@ -1,5 +1,5 @@
 # Builder stage
-FROM node:24-alpine AS builder
+FROM node:24-bookworm-slim AS builder
 
 WORKDIR /app
 
@@ -12,12 +12,14 @@ COPY . .
 RUN npm run build
 
 # Production stage - minimal image
-FROM node:24-alpine AS runner
+FROM node:24-bookworm-slim AS runner
 
 WORKDIR /app
 
 # Install runtime helpers
-RUN apk add --no-cache dumb-init su-exec
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends dumb-init gosu wget && \
+    rm -rf /var/lib/apt/lists/*
 
 ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
@@ -25,8 +27,8 @@ ENV NODE_ENV=production \
     PORT=3000
 
 # Create non-root user
-RUN addgroup -g 1001 -S nextjs && \
-    adduser -S nextjs -u 1001
+RUN groupadd --system --gid 1001 nextjs && \
+    useradd --system --uid 1001 --gid nextjs --create-home nextjs
 
 # Copy only built artifacts
 COPY --from=builder --chown=nextjs:nextjs /app/.next/standalone ./
@@ -38,6 +40,6 @@ RUN chmod +x ./docker-entrypoint.sh
 EXPOSE 3000
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:3000/api/posts || exit 1
+    CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:3000/api/health || exit 1
 
-ENTRYPOINT ["./docker-entrypoint.sh"]
+ENTRYPOINT ["dumb-init", "--", "./docker-entrypoint.sh"]

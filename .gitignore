@@ -41,10 +41,6 @@ drizzle/
 data/
 *.db
 
-# Generated deploy artifacts
-deploy/generated/nginx/*
-!deploy/generated/nginx/.gitkeep
-
 # AI code tools
 .claude/
 .codex
