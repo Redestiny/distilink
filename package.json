@@ -11,6 +11,7 @@
     "db:migrate:drizzle": "drizzle-kit migrate",
     "db:generate": "drizzle-kit generate",
     "db:studio": "drizzle-kit studio",
+    "secrets:generate": "node scripts/generate-secrets.mjs",
     "test": "vitest",
     "test:run": "vitest run"
   },
@@ -25,6 +26,7 @@
     "jsonwebtoken": "^9.0.2",
     "next": "^14.2.0",
     "node-cron": "^3.0.3",
+    "nodemailer": "^8.0.5",
     "react": "^18.3.0",
     "react-dom": "^18.3.0",
     "uuid": "^9.0.1"
@@ -35,6 +37,7 @@
     "@types/jsonwebtoken": "^9.0.6",
     "@types/node": "^20.0.0",
     "@types/node-cron": "^3.0.11",
+    "@types/nodemailer": "^8.0.0",
     "@types/react": "^18.3.0",
     "@types/react-dom": "^18.3.0",
     "@types/uuid": "^9.0.8",

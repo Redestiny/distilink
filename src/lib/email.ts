@@ -1,9 +1,10 @@
+import nodemailer from 'nodemailer'
+
 /**
- * Email Service - Tencent Cloud Direct Mail
+ * Email Service - Alibaba Cloud Direct Mail (SMTP)
  *
  * Send verification code emails to users.
- * Currently uses console output in MVP mode.
- * Configure TC_SECRET_ID, TC_SECRET_KEY, TC_REGION, TC_FROM_EMAIL in .env to enable.
+ * In development, falls back to console output when SMTP is not configured.
  */
 
 export interface EmailPayload {
@@ -12,62 +13,105 @@ export interface EmailPayload {
   html: string
 }
 
-// Check if Tencent Cloud email is configured
-function isEmailConfigured(): boolean {
-  return !!(
-    process.env.TC_SECRET_ID &&
-    process.env.TC_SECRET_KEY &&
-    process.env.TC_FROM_EMAIL
-  )
+interface SmtpConfig {
+  host: string
+  port: number
+  secure: boolean
+  user: string
+  password: string
+  fromAlias: string
+  replyTo?: string
+}
+
+function parseBoolean(value: string | undefined, defaultValue: boolean): boolean {
+  if (!value) {
+    return defaultValue
+  }
+
+  const normalized = value.trim().toLowerCase()
+  if (['1', 'true', 'yes', 'on'].includes(normalized)) {
+    return true
+  }
+
+  if (['0', 'false', 'no', 'off'].includes(normalized)) {
+    return false
+  }
+
+  return defaultValue
+}
+
+function getSmtpConfig(): SmtpConfig | null {
+  const user = process.env.ALIYUN_DM_SMTP_USER
+  const password = process.env.ALIYUN_DM_SMTP_PASSWORD
+
+  if (!user || !password) {
+    return null
+  }
+
+  const portValue = process.env.ALIYUN_DM_SMTP_PORT
+  const parsedPort = portValue ? Number.parseInt(portValue, 10) : 465
+
+  return {
+    host: process.env.ALIYUN_DM_SMTP_HOST || 'smtpdm.aliyun.com',
+    port: Number.isNaN(parsedPort) ? 465 : parsedPort,
+    secure: parseBoolean(process.env.ALIYUN_DM_SMTP_SECURE, true),
+    user,
+    password,
+    fromAlias: process.env.ALIYUN_DM_FROM_ALIAS || 'Distilink',
+    replyTo: process.env.ALIYUN_DM_REPLY_TO || undefined,
+  }
+}
+
+function formatFromAddress(config: SmtpConfig): string {
+  const alias = config.fromAlias.trim()
+  if (!alias) {
+    return config.user
+  }
+
+  return `${alias} <${config.user}>`
+}
+
+function isProduction(): boolean {
+  return process.env.NODE_ENV === 'production'
 }
 
 /**
- * Send an email via Tencent Cloud Direct Mail API
- * Falls back to console output if not configured (MVP mode)
+ * Send an email via Alibaba Cloud Direct Mail SMTP.
+ * In non-production, logs the payload when SMTP is not configured.
  */
 export async function sendEmail(payload: EmailPayload): Promise<boolean> {
   const { to, subject, html } = payload
+  const config = getSmtpConfig()
 
-  // MVP mode: output to console if not configured
-  if (!isEmailConfigured()) {
+  if (!config) {
+    if (isProduction()) {
+      console.error('[EMAIL] Alibaba Cloud SMTP is not configured in production')
+      return false
+    }
+
     console.log(`[EMAIL] To: ${to}, Subject: ${subject}`)
     console.log(`[EMAIL] HTML content:\n${html}`)
     return true
   }
 
   try {
-    const response = await fetch(
-      `https://cdmail.${
-        process.env.TC_REGION || 'ap-guangzhou'
-      }.api.tencentcloudapi.com`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-TC-Action': 'SendEmail',
-          'X-TC-Version': '2020-03-02',
-          'X-TC-Timestamp': Math.floor(Date.now() / 1000).toString(),
-          'X-TC-Region': process.env.TC_REGION || 'ap-guangzhou',
-        },
-        body: JSON.stringify({
-          FromEmailAddress: process.env.TC_FROM_EMAIL,
-          ToEmailAddress: to,
-          Subject: subject,
-          HtmlBody: html,
-        }),
-      }
-    )
+    const transporter = nodemailer.createTransport({
+      host: config.host,
+      port: config.port,
+      secure: config.secure,
+      auth: {
+        user: config.user,
+        pass: config.password,
+      },
+    })
 
-    if (!response.ok) {
-      console.error('[EMAIL] Tencent API error:', await response.text())
-      return false
-    }
-
-    const data = await response.json()
-    if (data.Response?.Error) {
-      console.error('[EMAIL] Tencent API error:', data.Response.Error)
-      return false
-    }
+    await transporter.sendMail({
+      from: formatFromAddress(config),
+      to,
+      subject,
+      html,
+      replyTo: config.replyTo,
+    })
 
     console.log(`[EMAIL] Sent successfully to ${to}`)
     return true

@@ -8,6 +8,8 @@ import { sendVerificationEmail } from '@/lib/email'
 export const dynamic = 'force-dynamic'
 
 export async function POST(request: NextRequest) {
+  let createdUserId: string | null = null
+
   try {
     const { email, password } = await request.json()
 
@@ -31,6 +33,7 @@ export async function POST(request: NextRequest) {
 
     // Create user with unverified status
     const userId = generateUserId()
+    createdUserId = userId
     const passwordHash = await hashPassword(password)
 
     db.insert(users).values({
@@ -43,13 +46,30 @@ export async function POST(request: NextRequest) {
     }).run()
 
     // Send verification email
-    await sendVerificationEmail(email, code)
+    const emailSent = await sendVerificationEmail(email, code)
+    if (!emailSent) {
+      db.delete(users).where(eq(users.userId, userId)).run()
+      createdUserId = null
+
+      return NextResponse.json(
+        { error: '验证码发送失败，请稍后重试' },
+        { status: 502 }
+      )
+    }
 
     return NextResponse.json({
       message: '注册成功，验证码已生成',
       userId,
     })
   } catch (error) {
+    if (createdUserId) {
+      try {
+        db.delete(users).where(eq(users.userId, createdUserId)).run()
+      } catch (rollbackError) {
+        console.error('Register rollback error:', rollbackError)
+      }
+    }
+
     console.error('Register error:', error)
     return NextResponse.json({ error: '服务器错误' }, { status: 500 })
   }
