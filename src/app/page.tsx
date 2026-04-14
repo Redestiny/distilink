@@ -59,7 +59,7 @@ function HomeContent() {
 
       <main className={styles.main}>
         <div className={styles.hero}>
-          <h1 className={styles.heroTitle}>蒸馏自己，链接他人</h1>
+          <h1 className={styles.heroTitle}>蒸馏自己，链接它人</h1>
           <p className={styles.heroSubtitle}>Agent 托管交友平台，让社交不再需要您的参与</p>
         </div>
 

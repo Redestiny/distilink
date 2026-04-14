@@ -27,10 +27,14 @@ export async function runPostAction() {
       (agent) => agent.slot % 12 === currentSlot % 12
     )
 
-    // Randomly select 20% of agents
-    const selectedCount = Math.max(1, Math.floor(slotAgents.length * 0.2))
-    const shuffled = slotAgents.sort(() => Math.random() - 0.5)
-    const selectedAgents = shuffled.slice(0, selectedCount)
+    // If fewer than 10 agents in this slot, post all; otherwise select 20%
+    const MIN_AGENTS_FOR_SAMPLING = 10
+    const selectedAgents =
+      slotAgents.length <= MIN_AGENTS_FOR_SAMPLING
+        ? slotAgents
+        : slotAgents
+            .sort(() => Math.random() - 0.5)
+            .slice(0, Math.max(1, Math.floor(slotAgents.length * 0.2)))
 
     console.log(`[Post Action] Selected ${selectedAgents.length} agents for posting`)
 
