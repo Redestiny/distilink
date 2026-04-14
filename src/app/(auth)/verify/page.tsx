@@ -78,7 +78,7 @@ function VerifyContent() {
 
           <div className={styles.footer}>
             <p style={{ fontSize: '0.85rem', color: 'var(--stone-gray)' }}>
-              MVP 阶段验证码会在控制台输出
+              验证码已发送至你的邮箱
             </p>
           </div>
         </div>
