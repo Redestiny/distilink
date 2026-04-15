@@ -58,7 +58,10 @@ jobs:
 
       - name: Normalize image name
         id: image
-        run: echo "name=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+        run: |
+          echo "name=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+          package="${GITHUB_REPOSITORY##*/}"
+          echo "package=${package,,}" >> "$GITHUB_OUTPUT"
 
       - name: Log in to GHCR
         uses: docker/login-action@v3
@@ -87,3 +90,81 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+
+  cleanup-images:
+    needs: docker
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/master'
+    continue-on-error: true
+    permissions:
+      packages: write
+
+    steps:
+      - name: Normalize package name
+        id: image
+        run: |
+          package="${GITHUB_REPOSITORY##*/}"
+          echo "package=${package,,}" >> "$GITHUB_OUTPUT"
+
+      - name: Delete old sha images
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner
+            const ownerType = context.payload.repository.owner.type
+            const packageName = '${{ steps.image.outputs.package }}'
+            const packageType = 'container'
+
+            const isShaTag = (tag) => /^sha-/.test(tag)
+
+            const listRoute =
+              ownerType === 'Organization'
+                ? 'GET /orgs/{org}/packages/{package_type}/{package_name}/versions'
+                : 'GET /users/{username}/packages/{package_type}/{package_name}/versions'
+
+            const listParams =
+              ownerType === 'Organization'
+                ? { org: owner, package_type: packageType, package_name: packageName, per_page: 100 }
+                : { username: owner, package_type: packageType, package_name: packageName, per_page: 100 }
+
+            const versions = await github.paginate(listRoute, listParams)
+            const shaOnlyVersions = versions
+              .filter((version) => {
+                const tags = version.metadata?.container?.tags ?? []
+                return tags.length > 0 && tags.every((tag) => isShaTag(tag))
+              })
+              .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+
+            const versionsToDelete = shaOnlyVersions.slice(5)
+            core.info(`Found ${shaOnlyVersions.length} sha-only images, deleting ${versionsToDelete.length}.`)
+
+            if (versionsToDelete.length === 0) {
+              return
+            }
+
+            const deleteRoute =
+              ownerType === 'Organization'
+                ? 'DELETE /orgs/{org}/packages/{package_type}/{package_name}/versions/{package_version_id}'
+                : 'DELETE /users/{username}/packages/{package_type}/{package_name}/versions/{package_version_id}'
+
+            for (const version of versionsToDelete) {
+              const tags = version.metadata?.container?.tags ?? []
+              core.info(`Deleting image version ${version.id} (${tags.join(', ') || 'untagged'})`)
+
+              const deleteParams =
+                ownerType === 'Organization'
+                  ? {
+                      org: owner,
+                      package_type: packageType,
+                      package_name: packageName,
+                      package_version_id: version.id,
+                    }
+                  : {
+                      username: owner,
+                      package_type: packageType,
+                      package_name: packageName,
+                      package_version_id: version.id,
+                    }
+
+              await github.request(deleteRoute, deleteParams)
+            }
