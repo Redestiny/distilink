@@ -73,7 +73,6 @@ jobs:
           images: ${{ steps.image.outputs.name }}
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
-            type=sha,format=short,prefix=sha-
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
 
@@ -102,8 +101,8 @@ jobs:
           package="${GITHUB_REPOSITORY##*/}"
           echo "package=${package,,}" >> "$GITHUB_OUTPUT"
 
-      - name: Delete old sha images
-        uses: actions/github-script@v7
+      - name: Delete non-version images
+        uses: actions/github-script@v8
         with:
           script: |
             const owner = context.repo.owner
@@ -111,7 +110,11 @@ jobs:
             const packageName = '${{ steps.image.outputs.package }}'
             const packageType = 'container'
 
-            const isShaTag = (tag) => /^sha-/.test(tag)
+            const isVersionTag = (tag) => /^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/.test(tag) || /^\d+\.\d+$/.test(tag)
+            const shouldKeepVersion = (version) => {
+              const tags = version.metadata?.container?.tags ?? []
+              return tags.includes('latest') || tags.some((tag) => isVersionTag(tag))
+            }
 
             const listRoute =
               ownerType === 'Organization'
@@ -124,15 +127,8 @@ jobs:
                 : { username: owner, package_type: packageType, package_name: packageName, per_page: 100 }
 
             const versions = await github.paginate(listRoute, listParams)
-            const shaOnlyVersions = versions
-              .filter((version) => {
-                const tags = version.metadata?.container?.tags ?? []
-                return tags.length > 0 && tags.every((tag) => isShaTag(tag))
-              })
-              .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
-
-            const versionsToDelete = shaOnlyVersions.slice(5)
-            core.info(`Found ${shaOnlyVersions.length} sha-only images, deleting ${versionsToDelete.length}.`)
+            const versionsToDelete = versions.filter((version) => !shouldKeepVersion(version))
+            core.info(`Found ${versions.length} package versions, deleting ${versionsToDelete.length} non-version entries.`)
 
             if (versionsToDelete.length === 0) {
               return
