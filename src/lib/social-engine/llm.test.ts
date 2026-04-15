@@ -94,6 +94,24 @@ describe('LLM Module', () => {
 
       expect(result).toBe('custom response')
     })
+
+    it('should throw error when LLM returns empty response', async () => {
+      mockSelectFromWhereGet.mockResolvedValue(undefined)
+
+      const { generateText } = await import('ai')
+      vi.mocked(generateText).mockResolvedValue({ text: '', finishReason: 'stop' } as any)
+
+      await expect(callLLM('test-agent', 'system', 'user')).rejects.toThrow('LLM returned empty response')
+    })
+
+    it('should throw error when LLM returns undefined response', async () => {
+      mockSelectFromWhereGet.mockResolvedValue(undefined)
+
+      const { generateText } = await import('ai')
+      vi.mocked(generateText).mockResolvedValue({ text: undefined, finishReason: 'unknown' } as any)
+
+      await expect(callLLM('test-agent', 'system', 'user')).rejects.toThrow('LLM returned empty response')
+    })
   })
 
   describe('generatePost', () => {

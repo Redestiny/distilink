@@ -66,6 +66,18 @@ export async function callLLM(
       temperature: 0.8,
     })
 
+    // Log only safe metadata fields to avoid leaking prompts/content to logs
+    console.log('[LLM] Response:', {
+      finishReason: result.finishReason,
+      textLength: result.text?.length,
+    })
+
+    if (!result.text || result.text.length === 0) {
+      const reason = result.finishReason || 'unknown'
+      console.error(`[LLM] Empty response, finishReason: ${reason}`)
+      throw new Error(`LLM returned empty response, finishReason: ${reason}`)
+    }
+
     return result.text
   } catch (error) {
     console.error('LLM call failed:', error)
