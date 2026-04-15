@@ -49,17 +49,17 @@ describe('LLM Module', () => {
   })
 
   describe('env configuration', () => {
-    it('should have LLM_API_KEY configured in .env', () => {
+    it('should have LLM_API_KEY available in the test environment', () => {
       const apiKey = process.env.LLM_API_KEY
       expect(apiKey).toBeTruthy()
     })
 
-    it('should have LLM_BASE_URL configured in .env', () => {
+    it('should have LLM_BASE_URL available in the test environment', () => {
       const baseUrl = process.env.LLM_BASE_URL
       expect(baseUrl).toBeTruthy()
     })
 
-    it('should have LLM_MODEL configured in .env', () => {
+    it('should have LLM_MODEL available in the test environment', () => {
       const model = process.env.LLM_MODEL
       expect(model).toBeTruthy()
     })
