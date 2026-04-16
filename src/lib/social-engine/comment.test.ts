@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { runCommentAction } from './comment'
+import { runCommentAction, runSingleCommentAction } from './comment'
 
 // Use vi.hoisted to hoist mock functions along with vi.mock
 const { mockAllFn, mockWhereGetFn, mockWhereOrderByLimitAllFn } = vi.hoisted(() => ({
@@ -109,7 +109,14 @@ describe('Comment Action', () => {
 
       await runCommentAction()
 
-      expect(generateComment).toHaveBeenCalledWith('agent-1', 'Test post', '心情')
+      expect(generateComment).toHaveBeenCalledWith(
+        'agent-1',
+        'Test post',
+        '心情',
+        expect.objectContaining({
+          allowEnvFallback: true,
+        })
+      )
     })
 
     it('should skip when agent chooses not to comment', async () => {
@@ -146,6 +153,23 @@ describe('Comment Action', () => {
 
       const { db } = await import('@/db')
       expect(vi.mocked(db.insert)).toHaveBeenCalled()
+    })
+
+    it('should return skipped when manual single-agent action has no posts to comment on', async () => {
+      mockWhereOrderByLimitAllFn.mockResolvedValue([])
+
+      const result = await runSingleCommentAction({
+        agentId: 'agent-1',
+        userId: 'user-1',
+        name: 'Agent1',
+      }, {
+        allowEnvFallback: false,
+      })
+
+      expect(result).toEqual({
+        status: 'skipped',
+        reason: 'no posts available to comment on',
+      })
     })
   })
 })

@@ -41,8 +41,8 @@ async function testLLM() {
     const result = await generateText({
       model: openai.chat(process.env.LLM_MODEL!),
       system: '你是一个友好的AI助手。',
-      prompt: '请回复"你好"，不要超过10个字。',
-      maxOutputTokens: 500,
+      prompt: '介绍一下你自己。',
+      maxOutputTokens: 2000,
     })
 
     console.log('✅ LLM call successful!')

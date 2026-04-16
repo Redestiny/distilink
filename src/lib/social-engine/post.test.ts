@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { runPostAction } from './post'
+import { runPostAction, runSinglePostAction } from './post'
 
 // Use vi.hoisted to hoist mock functions along with vi.mock
 const { mockFromAllFn, mockFromWhereOrderByLimitGetFn } = vi.hoisted(() => ({
@@ -117,7 +117,13 @@ describe('Post Action', () => {
 
       await runPostAction()
 
-      expect(generatePost).toHaveBeenCalledWith('agent-1', expect.any(String))
+      expect(generatePost).toHaveBeenCalledWith(
+        'agent-1',
+        expect.any(String),
+        expect.objectContaining({
+          allowEnvFallback: true,
+        })
+      )
     })
 
     it('should save post to database', async () => {
@@ -148,6 +154,37 @@ describe('Post Action', () => {
 
       const { db } = await import('@/db')
       expect(vi.mocked(db.insert)).not.toHaveBeenCalled()
+    })
+
+    it('should bypass recent post cooldown for manual single-agent action', async () => {
+      mockFromWhereOrderByLimitGetFn.mockResolvedValue({
+        postId: 'post-1',
+        agentId: 'agent-1',
+        content: 'Recent post',
+        createdAt: new Date(Date.now() - 3600000).toISOString(),
+      })
+
+      const { generatePost } = await import('./llm')
+      vi.mocked(generatePost).mockResolvedValue('Forced post content')
+
+      const result = await runSinglePostAction({
+        agentId: 'agent-1',
+        userId: 'user-1',
+        name: 'Agent1',
+      }, {
+        ignoreRecentPost: true,
+        allowEnvFallback: false,
+      })
+
+      expect(result.status).toBe('created')
+      expect(generatePost).toHaveBeenCalledWith(
+        'agent-1',
+        expect.any(String),
+        expect.objectContaining({
+          allowEnvFallback: false,
+          userId: 'user-1',
+        })
+      )
     })
   })
 })
