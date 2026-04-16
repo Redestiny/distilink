@@ -1,8 +1,19 @@
 import { db } from '@/db'
-import { agents, posts, comments } from '@/db/schema'
+import { Agent, agents, posts, comments } from '@/db/schema'
 import { eq, sql, and, ne } from 'drizzle-orm'
 import { v4 as uuidv4 } from 'uuid'
 import { generateComment } from './llm'
+
+export interface CommentActionResult {
+  status: 'created' | 'skipped' | 'failed'
+  commentId?: string
+  postId?: string
+  reason?: string
+}
+
+interface RunSingleCommentActionOptions {
+  allowEnvFallback?: boolean
+}
 
 export async function runCommentAction() {
   console.log('[Comment Action] Starting...')
@@ -29,70 +40,114 @@ export async function runCommentAction() {
     console.log(`[Comment Action] Processing ${slotAgents.length} agents`)
 
     for (const agent of slotAgents) {
-      try {
-        // Get recent posts (not from this agent) that haven't been commented on by this agent
-        const recentPosts = await db
-          .select()
-          .from(posts)
-          .where(ne(posts.agentId, agent.agentId))
-          .orderBy(sql`${posts.createdAt} DESC`)
-          .limit(20)
-          .all()
-
-        if (recentPosts.length === 0) continue
-
-        // Pick a random post
-        const post = recentPosts[Math.floor(Math.random() * recentPosts.length)]
-
-        // Check if already commented
-        const existingComment = await db
-          .select()
-          .from(comments)
-          .where(
-            and(
-              eq(comments.postId, post.postId),
-              eq(comments.agentId, agent.agentId)
-            )
-          )
-          .get()
-
-        if (existingComment) {
-          console.log(`[Comment Action] Agent ${agent.name} already commented on post ${post.postId}`)
-          continue
-        }
-
-        // Generate comment
-        const commentContent = await generateComment(
-          agent.agentId,
-          post.content,
-          post.topic
-        )
-
-        if (!commentContent) {
-          console.log(`[Comment Action] Agent ${agent.name} chose not to comment`)
-          continue
-        }
-
-        // Truncate to 200 chars
-        const truncatedContent = commentContent.slice(0, 200)
-
-        // Save comment
-        const commentId = uuidv4()
-        db.insert(comments).values({
-          commentId,
-          postId: post.postId,
-          agentId: agent.agentId,
-          content: truncatedContent,
-        }).run()
-
-        console.log(`[Comment Action] Agent ${agent.name} commented on post ${post.postId}: ${truncatedContent.slice(0, 50)}...`)
-      } catch (error) {
-        console.error(`[Comment Action] Error for agent ${agent.name}:`, error)
+      const result = await runSingleCommentAction(agent)
+      if (result.status === 'failed') {
+        console.error(`[Comment Action] Error for agent ${agent.name}: ${result.reason}`)
       }
     }
 
     console.log('[Comment Action] Completed')
   } catch (error) {
     console.error('[Comment Action] Error:', error)
+  }
+}
+
+async function getRecentCandidatePosts(agentId: string) {
+  return db
+    .select()
+    .from(posts)
+    .where(ne(posts.agentId, agentId))
+    .orderBy(sql`${posts.createdAt} DESC`)
+    .limit(20)
+    .all()
+}
+
+async function hasCommentedOnPost(agentId: string, postId: string) {
+  return db
+    .select()
+    .from(comments)
+    .where(
+      and(
+        eq(comments.postId, postId),
+        eq(comments.agentId, agentId)
+      )
+    )
+    .get()
+}
+
+export async function runSingleCommentAction(
+  agent: Pick<Agent, 'agentId' | 'name' | 'userId'>,
+  options: RunSingleCommentActionOptions = {}
+): Promise<CommentActionResult> {
+  const { allowEnvFallback = true } = options
+
+  try {
+    const recentPosts = await getRecentCandidatePosts(agent.agentId)
+    if (recentPosts.length === 0) {
+      return {
+        status: 'skipped',
+        reason: 'no posts available to comment on',
+      }
+    }
+
+    const post = recentPosts[0]
+    if (!post) {
+      return {
+        status: 'skipped',
+        reason: 'no posts available to comment on',
+      }
+    }
+
+    const existingComment = await hasCommentedOnPost(agent.agentId, post.postId)
+    if (existingComment) {
+      console.log(`[Comment Action] Agent ${agent.name} already commented on post ${post.postId}`)
+      return {
+        status: 'skipped',
+        postId: post.postId,
+        reason: 'agent already commented on post',
+      }
+    }
+
+    const commentContent = await generateComment(
+      agent.agentId,
+      post.content,
+      post.topic,
+      {
+        allowEnvFallback,
+        userId: agent.userId,
+      }
+    )
+
+    if (!commentContent) {
+      console.log(`[Comment Action] Agent ${agent.name} chose not to comment`)
+      return {
+        status: 'skipped',
+        postId: post.postId,
+        reason: 'agent chose not to comment',
+      }
+    }
+
+    const truncatedContent = commentContent.slice(0, 200)
+    const commentId = uuidv4()
+
+    db.insert(comments).values({
+      commentId,
+      postId: post.postId,
+      agentId: agent.agentId,
+      content: truncatedContent,
+    }).run()
+
+    console.log(`[Comment Action] Agent ${agent.name} commented on post ${post.postId}: ${truncatedContent.slice(0, 50)}...`)
+
+    return {
+      status: 'created',
+      commentId,
+      postId: post.postId,
+    }
+  } catch (error) {
+    return {
+      status: 'failed',
+      reason: error instanceof Error ? error.message : 'comment action failed',
+    }
   }
 }

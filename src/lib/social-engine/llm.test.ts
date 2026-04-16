@@ -1,16 +1,25 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { callLLM, generatePost, generateComment, generateDM, generateScore } from './llm'
+import {
+  callLLM,
+  generatePost,
+  generateComment,
+  generateDM,
+  generateScore,
+  resolveLLMConfig,
+} from './llm'
 
-// Use vi.hoisted to create mock functions that can be properly chained
-const mockSelectFromWhereGet = vi.hoisted(() => vi.fn<() => Promise<any>>())
+const { mockWhereGetFn, mockWhereAllFn } = vi.hoisted(() => ({
+  mockWhereGetFn: vi.fn<() => Promise<any>>(),
+  mockWhereAllFn: vi.fn<() => Promise<any[]>>(),
+}))
 
-// Mock dependencies
 vi.mock('@/db', () => ({
   db: {
     select: vi.fn().mockReturnValue({
       from: vi.fn().mockReturnValue({
         where: vi.fn().mockReturnValue({
-          get: mockSelectFromWhereGet,
+          get: mockWhereGetFn,
+          all: mockWhereAllFn,
         }),
       }),
     }),
@@ -26,7 +35,6 @@ vi.mock('@/lib/prompts', () => ({
   buildSystemPrompt: vi.fn().mockReturnValue('You are a test agent.'),
 }))
 
-// Mock the AI SDK
 vi.mock('ai', () => ({
   generateText: vi.fn(),
 }))
@@ -46,40 +54,73 @@ vi.mock('@ai-sdk/anthropic', () => ({
 describe('LLM Module', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockWhereAllFn.mockResolvedValue([])
   })
 
   describe('env configuration', () => {
     it('should have LLM_API_KEY available in the test environment', () => {
-      const apiKey = process.env.LLM_API_KEY
-      expect(apiKey).toBeTruthy()
+      expect(process.env.LLM_API_KEY).toBeTruthy()
     })
 
     it('should have LLM_BASE_URL available in the test environment', () => {
-      const baseUrl = process.env.LLM_BASE_URL
-      expect(baseUrl).toBeTruthy()
+      expect(process.env.LLM_BASE_URL).toBeTruthy()
     })
 
     it('should have LLM_MODEL available in the test environment', () => {
-      const model = process.env.LLM_MODEL
-      expect(model).toBeTruthy()
+      expect(process.env.LLM_MODEL).toBeTruthy()
     })
   })
 
-  describe('getLLMConfig', () => {
+  describe('resolveLLMConfig', () => {
     it('should fall back to env vars when no user config exists', async () => {
-      mockSelectFromWhereGet.mockResolvedValue(undefined)
+      mockWhereGetFn.mockResolvedValue(undefined)
 
-      const { generateText } = await import('ai')
-      vi.mocked(generateText).mockResolvedValue({ text: 'test response' } as any)
+      const result = await resolveLLMConfig('nonexistent-agent')
 
-      const result = await callLLM('nonexistent-agent', 'system', 'user')
-
-      expect(result).toBe('test response')
-      expect(generateText).toHaveBeenCalled()
+      expect(result).toEqual({
+        provider: 'openai',
+        baseURL: process.env.LLM_BASE_URL,
+        apiKey: process.env.LLM_API_KEY,
+        model: process.env.LLM_MODEL,
+      })
     })
 
+    it('should use user generic config when no agent config exists', async () => {
+      mockWhereGetFn.mockResolvedValue(undefined)
+      mockWhereAllFn.mockResolvedValue([
+        {
+          provider: 'openai',
+          baseURL: 'https://generic.api.com',
+          apiKey: 'generic-key',
+          model: 'generic-model',
+          agentId: null,
+        },
+      ])
+
+      const result = await resolveLLMConfig('test-agent', { userId: 'user-1' })
+
+      expect(result).toEqual({
+        provider: 'openai',
+        baseURL: 'https://generic.api.com',
+        apiKey: 'generic-key',
+        model: 'generic-model',
+      })
+    })
+
+    it('should reject when env fallback is disabled and only env config exists', async () => {
+      mockWhereGetFn.mockResolvedValue(undefined)
+      mockWhereAllFn.mockResolvedValue([])
+
+      await expect(resolveLLMConfig('test-agent', {
+        userId: 'user-1',
+        allowEnvFallback: false,
+      })).rejects.toThrow('LLM config not found')
+    })
+  })
+
+  describe('callLLM', () => {
     it('should use user config when available', async () => {
-      mockSelectFromWhereGet.mockResolvedValue({
+      mockWhereGetFn.mockResolvedValue({
         provider: 'openai',
         baseURL: 'https://custom.api.com',
         apiKey: 'custom-key',
@@ -96,7 +137,7 @@ describe('LLM Module', () => {
     })
 
     it('should throw error when LLM returns empty response', async () => {
-      mockSelectFromWhereGet.mockResolvedValue(undefined)
+      mockWhereGetFn.mockResolvedValue(undefined)
 
       const { generateText } = await import('ai')
       vi.mocked(generateText).mockResolvedValue({ text: '', finishReason: 'stop' } as any)
@@ -105,7 +146,7 @@ describe('LLM Module', () => {
     })
 
     it('should throw error when LLM returns undefined response', async () => {
-      mockSelectFromWhereGet.mockResolvedValue(undefined)
+      mockWhereGetFn.mockResolvedValue(undefined)
 
       const { generateText } = await import('ai')
       vi.mocked(generateText).mockResolvedValue({ text: undefined, finishReason: 'unknown' } as any)
@@ -116,12 +157,23 @@ describe('LLM Module', () => {
 
   describe('generatePost', () => {
     it('should generate post content', async () => {
-      mockSelectFromWhereGet.mockResolvedValue({
-        agentId: 'test-agent',
-        userId: 'test-user',
-        name: 'TestAgent',
-        profileMD: '# Test Agent\nA friendly AI agent.',
-      })
+      mockWhereGetFn
+        .mockResolvedValueOnce({
+          agentId: 'test-agent',
+          userId: 'test-user',
+          name: 'TestAgent',
+          profileMD: '# Test Agent\nA friendly AI agent.',
+        })
+        .mockResolvedValueOnce(undefined)
+      mockWhereAllFn.mockResolvedValueOnce([
+        {
+          provider: 'openai',
+          baseURL: 'https://generic.api.com',
+          apiKey: 'generic-key',
+          model: 'generic-model',
+          agentId: null,
+        },
+      ])
 
       const { generateText } = await import('ai')
       vi.mocked(generateText).mockResolvedValue({ text: '这是一条测试帖子。' } as any)
@@ -139,7 +191,7 @@ describe('LLM Module', () => {
     })
 
     it('should throw when agent not found', async () => {
-      mockSelectFromWhereGet.mockResolvedValue(undefined)
+      mockWhereGetFn.mockResolvedValue(undefined)
 
       await expect(generatePost('nonexistent', 'test')).rejects.toThrow('Agent not found')
     })
@@ -147,12 +199,23 @@ describe('LLM Module', () => {
 
   describe('generateComment', () => {
     it('should return null when agent chooses not to comment', async () => {
-      mockSelectFromWhereGet.mockResolvedValue({
-        agentId: 'test-agent',
-        userId: 'test-user',
-        name: 'TestAgent',
-        profileMD: '# Test Agent\nA friendly AI agent.',
-      })
+      mockWhereGetFn
+        .mockResolvedValueOnce({
+          agentId: 'test-agent',
+          userId: 'test-user',
+          name: 'TestAgent',
+          profileMD: '# Test Agent\nA friendly AI agent.',
+        })
+        .mockResolvedValueOnce(undefined)
+      mockWhereAllFn.mockResolvedValueOnce([
+        {
+          provider: 'openai',
+          baseURL: 'https://generic.api.com',
+          apiKey: 'generic-key',
+          model: 'generic-model',
+          agentId: null,
+        },
+      ])
 
       const { generateText } = await import('ai')
       vi.mocked(generateText).mockResolvedValue({ text: '不想回复' } as any)
@@ -163,12 +226,23 @@ describe('LLM Module', () => {
     })
 
     it('should return comment when agent wants to respond', async () => {
-      mockSelectFromWhereGet.mockResolvedValue({
-        agentId: 'test-agent',
-        userId: 'test-user',
-        name: 'TestAgent',
-        profileMD: '# Test Agent\nA friendly AI agent.',
-      })
+      mockWhereGetFn
+        .mockResolvedValueOnce({
+          agentId: 'test-agent',
+          userId: 'test-user',
+          name: 'TestAgent',
+          profileMD: '# Test Agent\nA friendly AI agent.',
+        })
+        .mockResolvedValueOnce(undefined)
+      mockWhereAllFn.mockResolvedValueOnce([
+        {
+          provider: 'openai',
+          baseURL: 'https://generic.api.com',
+          apiKey: 'generic-key',
+          model: 'generic-model',
+          agentId: null,
+        },
+      ])
 
       const { generateText } = await import('ai')
       vi.mocked(generateText).mockResolvedValue({ text: '说得很有道理！' } as any)
@@ -181,8 +255,7 @@ describe('LLM Module', () => {
 
   describe('generateDM', () => {
     it('should generate DM response', async () => {
-      // First call is for agent1, second call is for agent2
-      mockSelectFromWhereGet
+      mockWhereGetFn
         .mockResolvedValueOnce({
           agentId: 'agent1',
           userId: 'user1',
@@ -195,6 +268,16 @@ describe('LLM Module', () => {
           name: 'Agent2',
           profileMD: '# Agent2\nAnother agent.',
         })
+        .mockResolvedValueOnce(undefined)
+      mockWhereAllFn.mockResolvedValueOnce([
+        {
+          provider: 'openai',
+          baseURL: 'https://generic.api.com',
+          apiKey: 'generic-key',
+          model: 'generic-model',
+          agentId: null,
+        },
+      ])
 
       const { generateText } = await import('ai')
       vi.mocked(generateText).mockResolvedValue({ text: '你好，很高兴认识你！' } as any)
@@ -205,75 +288,209 @@ describe('LLM Module', () => {
     })
 
     it('should throw when agent not found', async () => {
-      mockSelectFromWhereGet.mockResolvedValue(undefined)
+      mockWhereGetFn.mockResolvedValue(undefined)
 
       await expect(generateDM('agent1', 'agent2', 'Hello')).rejects.toThrow('Agent not found')
     })
   })
 
   describe('generateScore', () => {
-    it('should generate score between 1-10', async () => {
-      mockSelectFromWhereGet.mockResolvedValue({
-        agentId: 'test-agent',
-        userId: 'test-user',
-        name: 'TestAgent',
-        profileMD: '# Test Agent\nA friendly AI agent.',
-      })
+    it('should generate score within the new range', async () => {
+      mockWhereGetFn
+        .mockResolvedValueOnce({
+          agentId: 'test-agent',
+          userId: 'test-user',
+          name: 'TestAgent',
+          profileMD: '# Test Agent\nA friendly AI agent.',
+        })
+        .mockResolvedValueOnce({
+          agentId: 'other-agent',
+          userId: 'other-user',
+          name: 'OtherAgent',
+          profileMD: '# Other Agent\nFriendly AI agent.',
+        })
+        .mockResolvedValueOnce(undefined)
+      mockWhereAllFn.mockResolvedValueOnce([
+        {
+          provider: 'openai',
+          baseURL: 'https://generic.api.com',
+          apiKey: 'generic-key',
+          model: 'generic-model',
+          agentId: null,
+        },
+      ])
 
       const { generateText } = await import('ai')
-      vi.mocked(generateText).mockResolvedValue({ text: '8' } as any)
+      vi.mocked(generateText).mockResolvedValue({ text: '4' } as any)
 
       const score = await generateScore('test-agent', 'other-agent', 'Hello there!')
 
-      expect(score).toBe(8)
+      expect(score).toBe(4)
     })
 
     it('should clamp score to valid range', async () => {
-      mockSelectFromWhereGet.mockResolvedValue({
-        agentId: 'test-agent',
-        userId: 'test-user',
-        name: 'TestAgent',
-        profileMD: '# Test Agent\nA friendly AI agent.',
-      })
+      mockWhereGetFn
+        .mockResolvedValueOnce({
+          agentId: 'test-agent',
+          userId: 'test-user',
+          name: 'TestAgent',
+          profileMD: '# Test Agent\nA friendly AI agent.',
+        })
+        .mockResolvedValueOnce({
+          agentId: 'other-agent',
+          userId: 'other-user',
+          name: 'OtherAgent',
+          profileMD: '# Other Agent\nFriendly AI agent.',
+        })
+        .mockResolvedValueOnce(undefined)
+      mockWhereAllFn.mockResolvedValueOnce([
+        {
+          provider: 'openai',
+          baseURL: 'https://generic.api.com',
+          apiKey: 'generic-key',
+          model: 'generic-model',
+          agentId: null,
+        },
+      ])
 
       const { generateText } = await import('ai')
       vi.mocked(generateText).mockResolvedValue({ text: '15' } as any)
 
       const score = await generateScore('test-agent', 'other-agent', 'Hello')
 
-      expect(score).toBe(10) // Clamped to max 10
+      expect(score).toBe(5)
     })
 
-    it('should parse score "10" correctly', async () => {
-      mockSelectFromWhereGet.mockResolvedValue({
-        agentId: 'test-agent',
-        userId: 'test-user',
-        name: 'TestAgent',
-        profileMD: '# Test Agent\nA friendly AI agent.',
-      })
+    it('should parse negative score correctly', async () => {
+      mockWhereGetFn
+        .mockResolvedValueOnce({
+          agentId: 'test-agent',
+          userId: 'test-user',
+          name: 'TestAgent',
+          profileMD: '# Test Agent\nA friendly AI agent.',
+        })
+        .mockResolvedValueOnce({
+          agentId: 'other-agent',
+          userId: 'other-user',
+          name: 'OtherAgent',
+          profileMD: '# Other Agent\nFriendly AI agent.',
+        })
+        .mockResolvedValueOnce(undefined)
+      mockWhereAllFn.mockResolvedValueOnce([
+        {
+          provider: 'openai',
+          baseURL: 'https://generic.api.com',
+          apiKey: 'generic-key',
+          model: 'generic-model',
+          agentId: null,
+        },
+      ])
 
       const { generateText } = await import('ai')
-      vi.mocked(generateText).mockResolvedValue({ text: '10' } as any)
+      vi.mocked(generateText).mockResolvedValue({ text: '-3' } as any)
 
       const score = await generateScore('test-agent', 'other-agent', 'Hello')
 
-      expect(score).toBe(10)
+      expect(score).toBe(-3)
     })
 
-    it('should default to 5 for invalid score', async () => {
-      mockSelectFromWhereGet.mockResolvedValue({
-        agentId: 'test-agent',
-        userId: 'test-user',
-        name: 'TestAgent',
-        profileMD: '# Test Agent\nA friendly AI agent.',
-      })
+    it('should clamp negative score to valid range', async () => {
+      mockWhereGetFn
+        .mockResolvedValueOnce({
+          agentId: 'test-agent',
+          userId: 'test-user',
+          name: 'TestAgent',
+          profileMD: '# Test Agent\nA friendly AI agent.',
+        })
+        .mockResolvedValueOnce({
+          agentId: 'other-agent',
+          userId: 'other-user',
+          name: 'OtherAgent',
+          profileMD: '# Other Agent\nFriendly AI agent.',
+        })
+        .mockResolvedValueOnce(undefined)
+      mockWhereAllFn.mockResolvedValueOnce([
+        {
+          provider: 'openai',
+          baseURL: 'https://generic.api.com',
+          apiKey: 'generic-key',
+          model: 'generic-model',
+          agentId: null,
+        },
+      ])
+
+      const { generateText } = await import('ai')
+      vi.mocked(generateText).mockResolvedValue({ text: '-9' } as any)
+
+      const score = await generateScore('test-agent', 'other-agent', 'Hello')
+
+      expect(score).toBe(-5)
+    })
+
+    it('should preserve zero score', async () => {
+      mockWhereGetFn
+        .mockResolvedValueOnce({
+          agentId: 'test-agent',
+          userId: 'test-user',
+          name: 'TestAgent',
+          profileMD: '# Test Agent\nA friendly AI agent.',
+        })
+        .mockResolvedValueOnce({
+          agentId: 'other-agent',
+          userId: 'other-user',
+          name: 'OtherAgent',
+          profileMD: '# Other Agent\nFriendly AI agent.',
+        })
+        .mockResolvedValueOnce(undefined)
+      mockWhereAllFn.mockResolvedValueOnce([
+        {
+          provider: 'openai',
+          baseURL: 'https://generic.api.com',
+          apiKey: 'generic-key',
+          model: 'generic-model',
+          agentId: null,
+        },
+      ])
+
+      const { generateText } = await import('ai')
+      vi.mocked(generateText).mockResolvedValue({ text: '0' } as any)
+
+      const score = await generateScore('test-agent', 'other-agent', 'Hello')
+
+      expect(score).toBe(0)
+    })
+
+    it('should default to 0 for invalid score', async () => {
+      mockWhereGetFn
+        .mockResolvedValueOnce({
+          agentId: 'test-agent',
+          userId: 'test-user',
+          name: 'TestAgent',
+          profileMD: '# Test Agent\nA friendly AI agent.',
+        })
+        .mockResolvedValueOnce({
+          agentId: 'other-agent',
+          userId: 'other-user',
+          name: 'OtherAgent',
+          profileMD: '# Other Agent\nFriendly AI agent.',
+        })
+        .mockResolvedValueOnce(undefined)
+      mockWhereAllFn.mockResolvedValueOnce([
+        {
+          provider: 'openai',
+          baseURL: 'https://generic.api.com',
+          apiKey: 'generic-key',
+          model: 'generic-model',
+          agentId: null,
+        },
+      ])
 
       const { generateText } = await import('ai')
       vi.mocked(generateText).mockResolvedValue({ text: 'invalid' } as any)
 
       const score = await generateScore('test-agent', 'other-agent', 'Hello')
 
-      expect(score).toBe(5) // Default when parse fails
+      expect(score).toBe(0)
     })
   })
 })

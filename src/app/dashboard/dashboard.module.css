@@ -27,6 +27,7 @@
 .buttonGroup {
   display: flex;
   gap: var(--space-sm);
+  flex-wrap: wrap;
 }
 
 .updateBtn {
@@ -59,6 +60,29 @@
 
 .configBtn:hover {
   background-color: var(--warm-sand-dark);
+}
+
+.wakeBtn {
+  padding: var(--space-sm) var(--space-md);
+  background-color: var(--terracotta);
+  color: var(--warm-white);
+  font-size: 0.9rem;
+  font-weight: 500;
+  border: none;
+  border-radius: var(--radius-sm);
+  box-shadow: var(--ring-warm);
+  cursor: pointer;
+  transition: background-color 0.2s, box-shadow 0.2s, opacity 0.2s;
+  flex-shrink: 0;
+}
+
+.wakeBtn:hover:not(:disabled) {
+  background-color: var(--terracotta-dark);
+}
+
+.wakeBtn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
 }
 
 .title {
@@ -106,7 +130,37 @@
   gap: var(--space-xl);
 }
 
+.wakeNotice,
+.wakeError {
+  margin-top: var(--space-md);
+  padding: var(--space-md);
+  border-radius: var(--radius-md);
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.wakeNotice {
+  background-color: rgba(201, 100, 66, 0.1);
+  border: 1px solid rgba(201, 100, 66, 0.25);
+  color: var(--charcoal-warm);
+}
+
+.wakeError {
+  background-color: rgba(181, 51, 51, 0.08);
+  border: 1px solid rgba(181, 51, 51, 0.2);
+  color: var(--error-crimson);
+}
+
 @media (max-width: 900px) {
+  .titleRow {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .buttonGroup {
+    width: 100%;
+  }
+
   .grid {
     grid-template-columns: 1fr;
   }
@@ -288,11 +342,21 @@
   border-radius: var(--radius-sm);
 }
 
+.success {
+  color: #2f6b47;
+  font-size: 0.9rem;
+  text-align: center;
+  padding: var(--space-sm);
+  background-color: rgba(47, 107, 71, 0.1);
+  border-radius: var(--radius-sm);
+}
+
 .modalActions {
   display: flex;
   gap: var(--space-md);
   justify-content: flex-end;
   margin-top: var(--space-md);
+  flex-wrap: wrap;
 }
 
 .cancelBtn {
@@ -308,6 +372,23 @@
 
 .cancelBtn:hover:not(:disabled) {
   background-color: var(--warm-sand-dark);
+}
+
+.secondaryBtn {
+  padding: var(--space-sm) var(--space-lg);
+  background-color: var(--warm-white);
+  color: var(--charcoal-warm);
+  font-size: 1rem;
+  border: 1px solid var(--warm-sand-dark);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background-color 0.2s, border-color 0.2s, color 0.2s;
+}
+
+.secondaryBtn:hover:not(:disabled) {
+  background-color: var(--warm-sand);
+  border-color: var(--terracotta);
+  color: var(--terracotta);
 }
 
 .submitBtn {
@@ -327,7 +408,8 @@
 }
 
 .submitBtn:disabled,
-.cancelBtn:disabled {
+.cancelBtn:disabled,
+.secondaryBtn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }

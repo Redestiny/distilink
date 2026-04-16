@@ -31,6 +31,12 @@ export default function DashboardPage() {
   })
   const [llmLoading, setLlmLoading] = useState(false)
   const [llmError, setLlmError] = useState('')
+  const [llmTestLoading, setLlmTestLoading] = useState(false)
+  const [llmTestMessage, setLlmTestMessage] = useState('')
+  const [llmTestError, setLlmTestError] = useState('')
+  const [wakeLoading, setWakeLoading] = useState(false)
+  const [wakeMessage, setWakeMessage] = useState('')
+  const [wakeError, setWakeError] = useState('')
 
   useEffect(() => {
     let isMounted = true
@@ -70,6 +76,8 @@ export default function DashboardPage() {
       setLlmForm({ provider: 'openai', baseURL: '', apiKey: '', model: '' })
       setShowLLMModal(true)
       setLlmError('')
+      setLlmTestError('')
+      setLlmTestMessage('')
     } catch {
       setLlmError('加载配置失败')
     }
@@ -98,10 +106,39 @@ export default function DashboardPage() {
       const listData = await listRes.json()
       setLlmConfigs(listData.configs || [])
       setLlmForm({ provider: 'openai', baseURL: '', apiKey: '', model: '' })
+      setLlmTestError('')
+      setLlmTestMessage('')
     } catch {
       setLlmError('网络错误')
     } finally {
       setLlmLoading(false)
+    }
+  }
+
+  const handleLLMTest = async () => {
+    setLlmError('')
+    setLlmTestError('')
+    setLlmTestMessage('')
+    setLlmTestLoading(true)
+
+    try {
+      const res = await fetch('/api/config/llm/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(llmForm),
+      })
+      const data = await res.json()
+
+      if (!res.ok) {
+        setLlmTestError(data.error || '连接失败')
+        return
+      }
+
+      setLlmTestMessage(data.message || '连接成功')
+    } catch {
+      setLlmTestError('网络错误')
+    } finally {
+      setLlmTestLoading(false)
     }
   }
 
@@ -116,6 +153,52 @@ export default function DashboardPage() {
       setLlmConfigs(llmConfigs.filter((c) => c.configId !== configId))
     } catch {
       setLlmError('删除失败')
+    }
+  }
+
+  const handleWake = async () => {
+    setWakeError('')
+    setWakeMessage('')
+    setWakeLoading(true)
+
+    try {
+      const res = await fetch('/api/agent/wake', {
+        method: 'POST',
+      })
+      const data = await res.json()
+
+      if (!res.ok) {
+        setWakeError(data.error || '行动失败')
+        return
+      }
+
+      const postStatus = data.result?.post?.status
+      const commentStatus = data.result?.comment?.status
+
+      let summary = 'Agent 已执行一次行动'
+      if (postStatus === 'created' && commentStatus === 'created') {
+        summary = 'Agent 已完成发帖并成功评论'
+      } else if (postStatus === 'created' && commentStatus === 'skipped') {
+        summary = 'Agent 已完成发帖，本次未产生评论'
+      } else if (postStatus === 'created' && commentStatus === 'failed') {
+        summary = 'Agent 已完成发帖，但评论失败'
+      } else if (postStatus === 'skipped' && commentStatus === 'created') {
+        summary = 'Agent 本次未发帖，但已成功评论'
+      } else if (postStatus === 'skipped' && commentStatus === 'skipped') {
+        summary = 'Agent 已尝试行动，但本次没有产生新内容'
+      } else if (postStatus === 'failed' && commentStatus === 'created') {
+        summary = 'Agent 发帖失败，但已成功评论'
+      } else if (postStatus === 'failed' && commentStatus === 'skipped') {
+        summary = 'Agent 发帖失败，本次未产生评论'
+      } else if (postStatus === 'failed' && commentStatus === 'failed') {
+        summary = 'Agent 本次行动未成功'
+      }
+
+      setWakeMessage(summary)
+    } catch {
+      setWakeError('网络错误')
+    } finally {
+      setWakeLoading(false)
     }
   }
 
@@ -241,8 +324,20 @@ export default function DashboardPage() {
               <button onClick={openLLMModal} className={styles.configBtn}>
                 配置 LLM
               </button>
+              <button
+                onClick={handleWake}
+                className={styles.wakeBtn}
+                disabled={wakeLoading}
+              >
+                {wakeLoading ? '行动中...' : '立即行动'}
+              </button>
             </div>
           </div>
+          {(wakeMessage || wakeError) && (
+            <div className={wakeError ? styles.wakeError : styles.wakeNotice}>
+              {wakeError || wakeMessage}
+            </div>
+          )}
         </div>
         <div className={styles.grid}>
           <section className={styles.feedSection}>
@@ -394,20 +489,30 @@ export default function DashboardPage() {
               </div>
 
               {llmError && <div className={styles.error}>{llmError}</div>}
+              {llmTestMessage && <div className={styles.success}>{llmTestMessage}</div>}
+              {llmTestError && <div className={styles.error}>{llmTestError}</div>}
 
               <div className={styles.modalActions}>
                 <button
                   type="button"
+                  onClick={handleLLMTest}
+                  className={styles.secondaryBtn}
+                  disabled={llmLoading || llmTestLoading || !llmForm.baseURL || !llmForm.apiKey || !llmForm.model}
+                >
+                  {llmTestLoading ? '测试中...' : '测试连接'}
+                </button>
+                <button
+                  type="button"
                   onClick={() => setShowLLMModal(false)}
                   className={styles.cancelBtn}
-                  disabled={llmLoading}
+                  disabled={llmLoading || llmTestLoading}
                 >
                   取消
                 </button>
                 <button
                   type="submit"
                   className={styles.submitBtn}
-                  disabled={llmLoading || !llmForm.baseURL || !llmForm.apiKey || !llmForm.model}
+                  disabled={llmLoading || llmTestLoading || !llmForm.baseURL || !llmForm.apiKey || !llmForm.model}
                 >
                   {llmLoading ? '保存中...' : '保存'}
                 </button>

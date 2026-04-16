@@ -118,9 +118,11 @@ describe('Prompts Module', () => {
       expect(scorePromptTemplate).toContain('{conversationHistory}')
     })
 
-    it('should ask for 1-10 score', () => {
-      expect(scorePromptTemplate).toContain('1-10')
-      expect(scorePromptTemplate).toContain('10分最高')
+    it('should ask for -5 to 5 score', () => {
+      expect(scorePromptTemplate).toContain('-5')
+      expect(scorePromptTemplate).toContain('5')
+      expect(scorePromptTemplate).toContain('0代表中性')
+      expect(scorePromptTemplate).toContain('负面')
     })
 
     it('should ask for single number response', () => {
