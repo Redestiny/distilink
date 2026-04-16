@@ -41,7 +41,7 @@ jobs:
   docker:
     needs: test
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v')
     permissions:
       contents: read
       packages: write
@@ -86,78 +86,3 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-
-  cleanup-images:
-    needs: docker
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/master'
-    continue-on-error: true
-    permissions:
-      packages: write
-
-    steps:
-      - name: Normalize package name
-        id: image
-        run: |
-          package="${GITHUB_REPOSITORY##*/}"
-          echo "package=${package,,}" >> "$GITHUB_OUTPUT"
-
-      - name: Delete non-version images
-        uses: actions/github-script@v8
-        with:
-          script: |
-            const owner = context.repo.owner
-            const ownerType = context.payload.repository.owner.type
-            const packageName = '${{ steps.image.outputs.package }}'
-            const packageType = 'container'
-
-            const isVersionTag = (tag) => /^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/.test(tag) || /^\d+\.\d+$/.test(tag)
-            const shouldKeepVersion = (version) => {
-              const tags = version.metadata?.container?.tags ?? []
-              return tags.includes('latest') || tags.some((tag) => isVersionTag(tag))
-            }
-
-            const listRoute =
-              ownerType === 'Organization'
-                ? 'GET /orgs/{org}/packages/{package_type}/{package_name}/versions'
-                : 'GET /users/{username}/packages/{package_type}/{package_name}/versions'
-
-            const listParams =
-              ownerType === 'Organization'
-                ? { org: owner, package_type: packageType, package_name: packageName, per_page: 100 }
-                : { username: owner, package_type: packageType, package_name: packageName, per_page: 100 }
-
-            const versions = await github.paginate(listRoute, listParams)
-            const versionsToDelete = versions.filter((version) => !shouldKeepVersion(version))
-            core.info(`Found ${versions.length} package versions, deleting ${versionsToDelete.length} non-version entries.`)
-
-            if (versionsToDelete.length === 0) {
-              return
-            }
-
-            const deleteRoute =
-              ownerType === 'Organization'
-                ? 'DELETE /orgs/{org}/packages/{package_type}/{package_name}/versions/{package_version_id}'
-                : 'DELETE /users/{username}/packages/{package_type}/{package_name}/versions/{package_version_id}'
-
-            for (const version of versionsToDelete) {
-              const tags = version.metadata?.container?.tags ?? []
-              core.info(`Deleting image version ${version.id} (${tags.join(', ') || 'untagged'})`)
-
-              const deleteParams =
-                ownerType === 'Organization'
-                  ? {
-                      org: owner,
-                      package_type: packageType,
-                      package_name: packageName,
-                      package_version_id: version.id,
-                    }
-                  : {
-                      username: owner,
-                      package_type: packageType,
-                      package_name: packageName,
-                      package_version_id: version.id,
-                    }
-
-              await github.request(deleteRoute, deleteParams)
-            }
