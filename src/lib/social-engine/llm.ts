@@ -235,7 +235,7 @@ export async function generateScore(
   if (!agent || !otherAgent) throw new Error('Agent not found')
 
   const systemPrompt = buildSystemPrompt(agent.profileMD)
-  const userPrompt = `对话已结束。请根据你们的聊天体验，给对方打分（1-10分）。
+  const userPrompt = `对话已结束。请根据你们的聊天体验，给对方打分（-5到5分）。
 
 对方角色：${otherAgent.name}
 对方设定：${otherAgent.profileMD}
@@ -243,13 +243,14 @@ export async function generateScore(
 对话内容：
 ${conversationHistory}
 
-只回复一个1-10的数字即可。`
+请只回复一个整数：-5 代表非常负面的体验，0 代表中性，5 代表非常好的体验。`
 
   const response = await callLLM(agentId, systemPrompt, userPrompt, {
     ...options,
     userId: options.userId ?? agent.userId,
   })
-  const score = parseInt(response.trim().replace(/[^0-9]/g, ''))
+  const scoreMatch = response.trim().match(/-?\d+/)
+  const score = scoreMatch ? parseInt(scoreMatch[0], 10) : 0
 
-  return Math.min(10, Math.max(1, score || 5))
+  return Math.min(5, Math.max(-5, score))
 }

@@ -295,7 +295,7 @@ describe('LLM Module', () => {
   })
 
   describe('generateScore', () => {
-    it('should generate score between 1-10', async () => {
+    it('should generate score within the new range', async () => {
       mockWhereGetFn
         .mockResolvedValueOnce({
           agentId: 'test-agent',
@@ -321,11 +321,11 @@ describe('LLM Module', () => {
       ])
 
       const { generateText } = await import('ai')
-      vi.mocked(generateText).mockResolvedValue({ text: '8' } as any)
+      vi.mocked(generateText).mockResolvedValue({ text: '4' } as any)
 
       const score = await generateScore('test-agent', 'other-agent', 'Hello there!')
 
-      expect(score).toBe(8)
+      expect(score).toBe(4)
     })
 
     it('should clamp score to valid range', async () => {
@@ -358,10 +358,10 @@ describe('LLM Module', () => {
 
       const score = await generateScore('test-agent', 'other-agent', 'Hello')
 
-      expect(score).toBe(10)
+      expect(score).toBe(5)
     })
 
-    it('should parse score \"10\" correctly', async () => {
+    it('should parse negative score correctly', async () => {
       mockWhereGetFn
         .mockResolvedValueOnce({
           agentId: 'test-agent',
@@ -387,14 +387,80 @@ describe('LLM Module', () => {
       ])
 
       const { generateText } = await import('ai')
-      vi.mocked(generateText).mockResolvedValue({ text: '10' } as any)
+      vi.mocked(generateText).mockResolvedValue({ text: '-3' } as any)
 
       const score = await generateScore('test-agent', 'other-agent', 'Hello')
 
-      expect(score).toBe(10)
+      expect(score).toBe(-3)
     })
 
-    it('should default to 5 for invalid score', async () => {
+    it('should clamp negative score to valid range', async () => {
+      mockWhereGetFn
+        .mockResolvedValueOnce({
+          agentId: 'test-agent',
+          userId: 'test-user',
+          name: 'TestAgent',
+          profileMD: '# Test Agent\nA friendly AI agent.',
+        })
+        .mockResolvedValueOnce({
+          agentId: 'other-agent',
+          userId: 'other-user',
+          name: 'OtherAgent',
+          profileMD: '# Other Agent\nFriendly AI agent.',
+        })
+        .mockResolvedValueOnce(undefined)
+      mockWhereAllFn.mockResolvedValueOnce([
+        {
+          provider: 'openai',
+          baseURL: 'https://generic.api.com',
+          apiKey: 'generic-key',
+          model: 'generic-model',
+          agentId: null,
+        },
+      ])
+
+      const { generateText } = await import('ai')
+      vi.mocked(generateText).mockResolvedValue({ text: '-9' } as any)
+
+      const score = await generateScore('test-agent', 'other-agent', 'Hello')
+
+      expect(score).toBe(-5)
+    })
+
+    it('should preserve zero score', async () => {
+      mockWhereGetFn
+        .mockResolvedValueOnce({
+          agentId: 'test-agent',
+          userId: 'test-user',
+          name: 'TestAgent',
+          profileMD: '# Test Agent\nA friendly AI agent.',
+        })
+        .mockResolvedValueOnce({
+          agentId: 'other-agent',
+          userId: 'other-user',
+          name: 'OtherAgent',
+          profileMD: '# Other Agent\nFriendly AI agent.',
+        })
+        .mockResolvedValueOnce(undefined)
+      mockWhereAllFn.mockResolvedValueOnce([
+        {
+          provider: 'openai',
+          baseURL: 'https://generic.api.com',
+          apiKey: 'generic-key',
+          model: 'generic-model',
+          agentId: null,
+        },
+      ])
+
+      const { generateText } = await import('ai')
+      vi.mocked(generateText).mockResolvedValue({ text: '0' } as any)
+
+      const score = await generateScore('test-agent', 'other-agent', 'Hello')
+
+      expect(score).toBe(0)
+    })
+
+    it('should default to 0 for invalid score', async () => {
       mockWhereGetFn
         .mockResolvedValueOnce({
           agentId: 'test-agent',
@@ -424,7 +490,7 @@ describe('LLM Module', () => {
 
       const score = await generateScore('test-agent', 'other-agent', 'Hello')
 
-      expect(score).toBe(5)
+      expect(score).toBe(0)
     })
   })
 })
