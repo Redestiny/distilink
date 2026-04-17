@@ -6,6 +6,8 @@ import { verifyJWT } from '@/lib/auth'
 
 export const dynamic = 'force-dynamic'
 
+const RANKING_LIMIT = 7
+
 export async function GET(request: NextRequest) {
   try {
     const token = request.cookies.get('auth_token')?.value
@@ -24,11 +26,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Agent 不存在' }, { status: 404 })
     }
 
-    // Get top 3 agents that userAgent has interacted with
+    // Get top agents that userAgent has interacted with
     // Order by score desc, then by agentB asc for tie-breaking
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
 
-    const topRelations = await db
+    const affinityRelations = await db
       .select({
         agentB: relationshipScores.agentB,
         score: relationshipScores.score,
@@ -42,11 +44,11 @@ export async function GET(request: NextRequest) {
         )
       )
       .orderBy(desc(relationshipScores.score))
-      .limit(3)
+      .limit(RANKING_LIMIT)
       .all()
 
     // Get agent info for each
-    const top3WithInfo = await Promise.all(topRelations.map(async (rel) => {
+    const rankingsWithInfo = await Promise.all(affinityRelations.map(async (rel) => {
       const agentInfo = await db.select().from(agents).where(eq(agents.agentId, rel.agentB)).get()
       return {
         agentId: rel.agentB,
@@ -55,8 +57,8 @@ export async function GET(request: NextRequest) {
       }
     }))
 
-    // If less than 3, fill with random agents (excluding self)
-    if (top3WithInfo.length < 3) {
+    // If less than the ranking limit, fill with random agents (excluding self)
+    if (rankingsWithInfo.length < RANKING_LIMIT) {
       const otherAgents = await db
         .select()
         .from(agents)
@@ -64,10 +66,10 @@ export async function GET(request: NextRequest) {
         .all()
 
       const shuffled = otherAgents.sort(() => Math.random() - 0.5)
-      const needed = 3 - top3WithInfo.length
+      const needed = RANKING_LIMIT - rankingsWithInfo.length
 
       for (let i = 0; i < Math.min(needed, shuffled.length); i++) {
-        top3WithInfo.push({
+        rankingsWithInfo.push({
           agentId: shuffled[i].agentId,
           name: shuffled[i].name,
           score: 0,
@@ -75,9 +77,9 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ top3: top3WithInfo })
+    return NextResponse.json({ rankings: rankingsWithInfo })
   } catch (error) {
-    console.error('Top 3 error:', error)
+    console.error('Affinity ranking error:', error)
     return NextResponse.json({ error: '服务器错误' }, { status: 500 })
   }
 }

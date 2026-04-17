@@ -1,4 +1,5 @@
 .container {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: var(--space-md);
@@ -58,6 +59,11 @@
   background-color: #b87333;
 }
 
+.rankBadge.neutral {
+  background-color: var(--warm-sand-dark);
+  color: var(--charcoal-warm);
+}
+
 .info {
   flex: 1;
   display: flex;
@@ -97,8 +103,50 @@
   color: var(--warm-white);
 }
 
-.chatSection {
-  margin-top: var(--space-md);
-  padding-top: var(--space-md);
-  border-top: 1px solid var(--warm-sand);
+.chatOverlay {
+  position: absolute;
+  z-index: 5;
+  top: 0;
+  left: 0;
+  right: 0;
+  min-height: 100%;
+  max-height: min(560px, calc(100vh - 220px));
+  overflow-y: auto;
+  padding: var(--space-lg);
+  padding-top: var(--space-xl);
+  background-color: var(--ivory);
+  border: 1px solid var(--warm-sand);
+  border-radius: var(--radius-md);
+  box-shadow: var(--ring-warm), var(--whisper-strong);
+}
+
+.closeOverlayBtn {
+  position: absolute;
+  top: var(--space-sm);
+  right: var(--space-sm);
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--stone-gray);
+  font-size: 1.1rem;
+  line-height: 1;
+  background-color: var(--warm-sand);
+  border-radius: 50%;
+  transition: background-color 0.2s, color 0.2s;
+}
+
+.closeOverlayBtn:hover {
+  color: var(--charcoal-warm);
+  background-color: var(--warm-sand-dark);
+}
+
+@media (max-width: 640px) {
+  .chatOverlay {
+    top: 0;
+    padding: var(--space-md);
+    padding-top: var(--space-xl);
+    max-height: min(520px, calc(100vh - 180px));
+  }
 }

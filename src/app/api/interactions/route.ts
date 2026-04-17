@@ -69,6 +69,7 @@ export async function GET(request: NextRequest) {
         content: log.content,
         agentName: otherAgent?.name || '未知',
         isOwn,
+        timestamp: log.timestamp,
       }
     }))
 

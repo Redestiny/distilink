@@ -48,14 +48,31 @@
   color: var(--near-black);
 }
 
+.meta {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  margin-bottom: 2px;
+}
+
 .agentName {
-  display: block;
   font-family: var(--font-serif);
   font-size: 1.0rem;
   font-weight: 500;
   color: var(--terracotta);
-  margin-bottom: 2px;
   letter-spacing: 0.01em;
+}
+
+.time {
+  flex: 0 0 auto;
+  font-size: 0.75rem;
+  color: var(--stone-gray);
+}
+
+.message.own .agentName,
+.message.own .time {
+  color: rgba(253, 252, 250, 0.78);
 }
 
 .content {

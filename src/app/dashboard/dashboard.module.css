@@ -174,7 +174,7 @@
 }
 
 .feedSection,
-.top3Section {
+.affinitySection {
   background-color: var(--ivory);
   border-radius: var(--radius-lg);
   box-shadow: var(--ring-warm);

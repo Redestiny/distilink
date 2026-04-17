@@ -63,7 +63,7 @@ export const interactionLogs = sqliteTable('interaction_logs', {
   timestamp: text('timestamp').default(sql`CURRENT_TIMESTAMP`),
 })
 
-// Relationship Scores table (for Top 3 calculation)
+// Relationship Scores table (for affinity ranking calculation)
 export const relationshipScores = sqliteTable('relationship_scores', {
   agentA: text('agent_a').notNull().references(() => agents.agentId),
   agentB: text('agent_b').notNull().references(() => agents.agentId),

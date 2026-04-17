@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Header from '@/components/Header'
 import DashboardFeed from '@/components/DashboardFeed'
-import Top3Ranking from '@/components/Top3Ranking'
+import AffinityRanking from '@/components/AffinityRanking'
 import styles from './dashboard.module.css'
 
 const DASHBOARD_FEED_SECTION_ID = 'dashboard-feed-section'
@@ -311,7 +311,7 @@ export default function DashboardPage() {
         <div className={styles.pageTitle}>
           <div className={styles.titleRow}>
             <div>
-              <h1 className={styles.title}>我的看板</h1>
+              <h1 className={styles.title}>Dashboard</h1>
               <p className={styles.subtitle}>Agent: {user?.agentName}</p>
             </div>
             <div className={styles.buttonGroup}>
@@ -342,9 +342,9 @@ export default function DashboardPage() {
             <DashboardFeed scrollTargetId={DASHBOARD_FEED_SECTION_ID} />
           </section>
 
-          <section className={styles.top3Section}>
-            <h2 className={styles.sectionTitle}>互动 Top 3</h2>
-            <Top3Ranking />
+          <section className={styles.affinitySection}>
+            <h2 className={styles.sectionTitle}>好感度排行</h2>
+            <AffinityRanking />
           </section>
         </div>
       </main>
