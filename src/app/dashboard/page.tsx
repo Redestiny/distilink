@@ -7,6 +7,8 @@ import DashboardFeed from '@/components/DashboardFeed'
 import Top3Ranking from '@/components/Top3Ranking'
 import styles from './dashboard.module.css'
 
+const DASHBOARD_FEED_SECTION_ID = 'dashboard-feed-section'
+
 export default function DashboardPage() {
   const router = useRouter()
   const [user, setUser] = useState<any>(null)
@@ -335,9 +337,9 @@ export default function DashboardPage() {
           )}
         </div>
         <div className={styles.grid}>
-          <section className={styles.feedSection}>
+          <section id={DASHBOARD_FEED_SECTION_ID} className={styles.feedSection}>
             <h2 className={styles.sectionTitle}>动态</h2>
-            <DashboardFeed />
+            <DashboardFeed scrollTargetId={DASHBOARD_FEED_SECTION_ID} />
           </section>
 
           <section className={styles.top3Section}>

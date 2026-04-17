@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, Suspense, useLayoutEffect, useRef } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Header from '@/components/Header'
 import PostCard from '@/components/PostCard'
 import TabNav from '@/components/TabNav'
@@ -29,19 +29,74 @@ type HomePostListSnapshot = PostListSnapshot<Post>
 const RESTORE_SCROLL_OFFSET = 96
 const RESTORE_MAX_ATTEMPTS = 30
 const RESTORE_SCROLL_TOLERANCE = 8
+const HOME_POSTS_FALLBACK_PAGE_SIZE = 20
+
+interface PostsResponse {
+  posts: Post[]
+  page: number
+  pageSize: number
+  total: number
+  totalPages: number
+}
+
+function parsePageParam(pageParam: string | null) {
+  const parsedPage = Number.parseInt(pageParam || '1', 10)
+  if (Number.isNaN(parsedPage) || parsedPage < 1) {
+    return 1
+  }
+
+  return parsedPage
+}
+
+function isCanonicalPageParam(pageParam: string | null, page: number) {
+  if (page <= 1) {
+    return pageParam === null
+  }
+
+  return pageParam === String(page)
+}
+
+function buildHomePageHref(tab: string, page: number, currentSearch: string) {
+  const params = new URLSearchParams(currentSearch)
+
+  if (tab === 'realtime') {
+    params.delete('tab')
+  } else {
+    params.set('tab', tab)
+  }
+
+  if (page <= 1) {
+    params.delete('page')
+  } else {
+    params.set('page', String(page))
+  }
+
+  const query = params.toString()
+  return query ? `/?${query}` : '/'
+}
 
 function HomeContent() {
+  const router = useRouter()
   const searchParams = useSearchParams()
+  const currentSearch = searchParams.toString()
+  const pageParam = searchParams.get('page')
   const tab = searchParams.get('tab') || 'realtime'
-  const returnPath = tab === 'realtime' ? '/' : `/?tab=${tab}`
+  const currentPage = parsePageParam(pageParam)
   const [posts, setPosts] = useState<Post[]>([])
-  const [loading, setLoading] = useState(false)
-  const [hasMore, setHasMore] = useState(false)
-  const [page, setPage] = useState(1)
+  const [loading, setLoading] = useState(true)
+  const [pagination, setPagination] = useState({
+    page: currentPage,
+    pageSize: HOME_POSTS_FALLBACK_PAGE_SIZE,
+    total: 0,
+    totalPages: 0,
+  })
   const [isBootstrapping, setIsBootstrapping] = useState(true)
   const [restoreSnapshot, setRestoreSnapshot] = useState<HomePostListSnapshot | null>(null)
   const restoredFromSnapshotRef = useRef(false)
   const hasAppliedRestoreRef = useRef(false)
+  const pendingScrollPageRef = useRef<number | null>(null)
+  const feedRef = useRef<HTMLDivElement | null>(null)
+  const returnPath = buildHomePageHref(tab, pagination.page || currentPage, currentSearch)
 
   useLayoutEffect(() => {
     hasAppliedRestoreRef.current = false
@@ -49,11 +104,15 @@ function HomeContent() {
     const snapshot = readPostListSnapshot<Post>()
     const hasPendingRestore = isPostListRestorePending()
 
-    if (hasPendingRestore && snapshot && snapshot.tab === tab) {
+    if (hasPendingRestore && snapshot && snapshot.tab === tab && snapshot.page === currentPage) {
       restoredFromSnapshotRef.current = true
       setPosts(snapshot.posts)
-      setHasMore(snapshot.hasMore)
-      setPage(snapshot.page)
+      setPagination({
+        page: snapshot.page,
+        pageSize: snapshot.pageSize || HOME_POSTS_FALLBACK_PAGE_SIZE,
+        total: snapshot.total || snapshot.posts.length,
+        totalPages: snapshot.totalPages || snapshot.page,
+      })
       setLoading(false)
       setRestoreSnapshot(snapshot)
       setIsBootstrapping(false)
@@ -66,11 +125,16 @@ function HomeContent() {
     }
 
     setPosts([])
-    setHasMore(false)
-    setPage(1)
+    setPagination({
+      page: currentPage,
+      pageSize: HOME_POSTS_FALLBACK_PAGE_SIZE,
+      total: 0,
+      totalPages: 0,
+    })
+    setLoading(true)
     setRestoreSnapshot(null)
     setIsBootstrapping(false)
-  }, [tab])
+  }, [currentPage, tab])
 
   useEffect(() => {
     if (isBootstrapping || restoredFromSnapshotRef.current) return
@@ -78,13 +142,22 @@ function HomeContent() {
     let isMounted = true
     setLoading(true)
 
-    fetch(`/api/posts?tab=${tab}&page=1`)
+    fetch(`/api/posts?tab=${tab}&page=${currentPage}`)
       .then((res) => res.json())
-      .then((data) => {
+      .then((data: PostsResponse) => {
         if (!isMounted) return
         setPosts(data.posts || [])
-        setHasMore(data.hasMore)
-        setPage(1)
+        setPagination({
+          page: data.page || 1,
+          pageSize: data.pageSize || HOME_POSTS_FALLBACK_PAGE_SIZE,
+          total: data.total || 0,
+          totalPages: data.totalPages || 0,
+        })
+
+        const serverPage = data.page || 1
+        if (serverPage !== currentPage || !isCanonicalPageParam(pageParam, serverPage)) {
+          router.replace(buildHomePageHref(tab, serverPage, currentSearch), { scroll: false })
+        }
       })
       .catch(console.error)
       .finally(() => {
@@ -95,7 +168,21 @@ function HomeContent() {
     return () => {
       isMounted = false
     }
-  }, [isBootstrapping, tab])
+  }, [currentPage, currentSearch, isBootstrapping, pageParam, router, tab])
+
+  useEffect(() => {
+    if (loading || pendingScrollPageRef.current === null || pendingScrollPageRef.current !== pagination.page) {
+      return
+    }
+
+    const targetElement = feedRef.current
+    const top = targetElement
+      ? Math.max(targetElement.getBoundingClientRect().top + window.scrollY - RESTORE_SCROLL_OFFSET, 0)
+      : 0
+
+    window.scrollTo({ top })
+    pendingScrollPageRef.current = null
+  }, [loading, pagination.page])
 
   useEffect(() => {
     if (!restoreSnapshot || hasAppliedRestoreRef.current) return
@@ -154,8 +241,11 @@ function HomeContent() {
     const snapshot: HomePostListSnapshot = {
       tab,
       posts,
-      page,
-      hasMore,
+      page: pagination.page,
+      pageSize: pagination.pageSize,
+      total: pagination.total,
+      totalPages: pagination.totalPages,
+      hasMore: pagination.page < pagination.totalPages,
       scrollY: window.scrollY,
       targetPostId: postId,
       savedAt: Date.now(),
@@ -164,14 +254,13 @@ function HomeContent() {
     savePostListSnapshot(snapshot)
   }
 
-  const loadMore = async () => {
-    if (!hasMore || loading || isBootstrapping) return
-    const nextPage = page + 1
-    const res = await fetch(`/api/posts?tab=${tab}&page=${nextPage}`)
-    const data = await res.json()
-    setPosts((prev) => [...prev, ...(data.posts || [])])
-    setHasMore(data.hasMore)
-    setPage(nextPage)
+  const handlePageChange = (nextPage: number) => {
+    if (loading || nextPage === pagination.page || nextPage < 1 || nextPage > pagination.totalPages) {
+      return
+    }
+
+    pendingScrollPageRef.current = nextPage
+    router.push(buildHomePageHref(tab, nextPage, currentSearch), { scroll: false })
   }
 
   return (
@@ -196,7 +285,7 @@ function HomeContent() {
           </Suspense>
         </div>
 
-        <div className={styles.feed}>
+        <div ref={feedRef} className={styles.feed}>
           {isBootstrapping ? null : loading && posts.length === 0 ? (
             <div className={styles.loading}>加载中...</div>
           ) : posts.length === 0 ? (
@@ -216,10 +305,28 @@ function HomeContent() {
                   />
                 ))}
               </div>
-              {hasMore && (
-                <button onClick={loadMore} className={styles.loadMore} disabled={loading}>
-                  {loading ? '加载中...' : '加载更多'}
-                </button>
+              {pagination.totalPages > 1 && (
+                <nav className={styles.pagination} aria-label="帖子分页">
+                  <button
+                    type="button"
+                    className={styles.paginationBtn}
+                    onClick={() => handlePageChange(pagination.page - 1)}
+                    disabled={loading || pagination.page <= 1}
+                  >
+                    上一页
+                  </button>
+                  <span className={styles.paginationInfo}>
+                    第 {pagination.page} / {pagination.totalPages} 页
+                  </span>
+                  <button
+                    type="button"
+                    className={styles.paginationBtn}
+                    onClick={() => handlePageChange(pagination.page + 1)}
+                    disabled={loading || pagination.page >= pagination.totalPages}
+                  >
+                    下一页
+                  </button>
+                </nav>
               )}
             </>
           )}

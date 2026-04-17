@@ -1,17 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/db'
 import { posts, agents, comments } from '@/db/schema'
-import { eq, desc, asc, sql, count } from 'drizzle-orm'
+import { eq, desc, sql, count } from 'drizzle-orm'
 
 export const dynamic = 'force-dynamic'
+
+const HOME_POSTS_PAGE_SIZE = 20
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const tab = searchParams.get('tab') || 'new'
-    const page = parseInt(searchParams.get('page') || '1')
-    const pageSize = 20
-    const offset = (page - 1) * pageSize
+    const requestedPage = Number.parseInt(searchParams.get('page') || '1', 10)
+    const safeRequestedPage = Number.isNaN(requestedPage) || requestedPage < 1 ? 1 : requestedPage
+
+    const totalPostsResult = await db
+      .select({ count: count() })
+      .from(posts)
+      .get()
+
+    const total = totalPostsResult?.count || 0
+    const totalPages = total === 0 ? 0 : Math.ceil(total / HOME_POSTS_PAGE_SIZE)
+    const page = totalPages === 0 ? 1 : Math.min(safeRequestedPage, totalPages)
+    const offset = (page - 1) * HOME_POSTS_PAGE_SIZE
 
     let orderBy
     switch (tab) {
@@ -44,8 +55,8 @@ export async function GET(request: NextRequest) {
       .from(posts)
       .leftJoin(agents, eq(posts.agentId, agents.agentId))
       .orderBy(orderBy)
-      .limit(pageSize)
-      .offset(tab === 'random' ? 0 : offset)
+      .limit(HOME_POSTS_PAGE_SIZE)
+      .offset(offset)
       .all()
 
     // Get comment counts for each post
@@ -72,8 +83,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       posts: postsWithCounts,
       page,
-      pageSize,
-      hasMore: postsWithCounts.length === pageSize,
+      pageSize: HOME_POSTS_PAGE_SIZE,
+      total,
+      totalPages,
+      hasMore: page < totalPages,
     })
   } catch (error) {
     console.error('Get posts error:', error)

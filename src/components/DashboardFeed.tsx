@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { Suspense, useEffect, useRef, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import styles from './DashboardFeed.module.css'
 
 interface Comment {
@@ -19,19 +20,103 @@ interface Post {
   comments: Comment[]
 }
 
-export default function DashboardFeed() {
+interface DashboardFeedResponse {
+  posts: Post[]
+  page: number
+  pageSize: number
+  total: number
+  totalPages: number
+}
+
+interface DashboardFeedProps {
+  scrollTargetId?: string
+}
+
+const DASHBOARD_FEED_SCROLL_OFFSET = 96
+
+function parsePageParam(pageParam: string | null) {
+  const parsedPage = Number.parseInt(pageParam || '1', 10)
+  if (Number.isNaN(parsedPage) || parsedPage < 1) {
+    return 1
+  }
+
+  return parsedPage
+}
+
+function buildDashboardPageHref(page: number, currentSearch: string) {
+  const params = new URLSearchParams(currentSearch)
+
+  if (page <= 1) {
+    params.delete('page')
+  } else {
+    params.set('page', String(page))
+  }
+
+  const query = params.toString()
+  return query ? `/dashboard?${query}` : '/dashboard'
+}
+
+function DashboardFeedContent({ scrollTargetId }: DashboardFeedProps) {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const currentSearch = searchParams.toString()
+  const currentPage = parsePageParam(searchParams.get('page'))
   const [posts, setPosts] = useState<Post[]>([])
   const [loading, setLoading] = useState(true)
+  const [pagination, setPagination] = useState({
+    page: 1,
+    pageSize: 5,
+    total: 0,
+    totalPages: 0,
+  })
+  const pendingScrollPageRef = useRef<number | null>(null)
 
   useEffect(() => {
-    fetch('/api/dashboard/feed')
+    let isMounted = true
+
+    setLoading(true)
+
+    fetch(`/api/dashboard/feed?page=${currentPage}`)
       .then((res) => res.json())
-      .then((data) => {
+      .then((data: DashboardFeedResponse) => {
+        if (!isMounted) return
         setPosts(data.posts || [])
+        setPagination({
+          page: data.page || 1,
+          pageSize: data.pageSize || 5,
+          total: data.total || 0,
+          totalPages: data.totalPages || 0,
+        })
+
+        const serverPage = data.page || 1
+        if (serverPage !== currentPage) {
+          router.replace(buildDashboardPageHref(serverPage, currentSearch), { scroll: false })
+        }
       })
       .catch(console.error)
-      .finally(() => setLoading(false))
-  }, [])
+      .finally(() => {
+        if (!isMounted) return
+        setLoading(false)
+      })
+
+    return () => {
+      isMounted = false
+    }
+  }, [currentPage, currentSearch, router])
+
+  useEffect(() => {
+    if (loading || pendingScrollPageRef.current === null || pendingScrollPageRef.current !== pagination.page) {
+      return
+    }
+
+    const targetElement = scrollTargetId ? document.getElementById(scrollTargetId) : null
+    const top = targetElement
+      ? Math.max(targetElement.getBoundingClientRect().top + window.scrollY - DASHBOARD_FEED_SCROLL_OFFSET, 0)
+      : 0
+
+    window.scrollTo({ top })
+    pendingScrollPageRef.current = null
+  }, [loading, pagination.page, scrollTargetId])
 
   const formatTime = (dateStr: string) => {
     const date = new Date(dateStr)
@@ -46,6 +131,15 @@ export default function DashboardFeed() {
     if (hours < 24) return `${hours}小时前`
     if (days < 7) return `${days}天前`
     return date.toLocaleDateString('zh-CN')
+  }
+
+  const handlePageChange = (nextPage: number) => {
+    if (loading || nextPage === pagination.page || nextPage < 1 || nextPage > pagination.totalPages) {
+      return
+    }
+
+    pendingScrollPageRef.current = nextPage
+    router.push(buildDashboardPageHref(nextPage, currentSearch), { scroll: false })
   }
 
   if (loading) {
@@ -85,6 +179,38 @@ export default function DashboardFeed() {
           )}
         </article>
       ))}
+
+      {pagination.totalPages > 1 && (
+        <nav className={styles.pagination} aria-label="动态分页">
+          <button
+            type="button"
+            className={styles.paginationBtn}
+            onClick={() => handlePageChange(pagination.page - 1)}
+            disabled={loading || pagination.page <= 1}
+          >
+            上一页
+          </button>
+          <span className={styles.paginationInfo}>
+            第 {pagination.page} / {pagination.totalPages} 页
+          </span>
+          <button
+            type="button"
+            className={styles.paginationBtn}
+            onClick={() => handlePageChange(pagination.page + 1)}
+            disabled={loading || pagination.page >= pagination.totalPages}
+          >
+            下一页
+          </button>
+        </nav>
+      )}
     </div>
+  )
+}
+
+export default function DashboardFeed(props: DashboardFeedProps) {
+  return (
+    <Suspense fallback={<div className={styles.loading}>加载中...</div>}>
+      <DashboardFeedContent {...props} />
+    </Suspense>
   )
 }

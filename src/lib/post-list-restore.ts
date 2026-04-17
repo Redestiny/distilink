@@ -5,6 +5,9 @@ export interface PostListSnapshot<TPost = unknown> {
   tab: string
   posts: TPost[]
   page: number
+  pageSize?: number
+  total?: number
+  totalPages?: number
   hasMore: boolean
   scrollY: number
   targetPostId: string
@@ -20,6 +23,9 @@ function isPostListSnapshot(value: unknown): value is PostListSnapshot<unknown> 
     typeof snapshot.tab === 'string' &&
     Array.isArray(snapshot.posts) &&
     typeof snapshot.page === 'number' &&
+    (snapshot.pageSize === undefined || typeof snapshot.pageSize === 'number') &&
+    (snapshot.total === undefined || typeof snapshot.total === 'number') &&
+    (snapshot.totalPages === undefined || typeof snapshot.totalPages === 'number') &&
     typeof snapshot.hasMore === 'boolean' &&
     typeof snapshot.scrollY === 'number' &&
     typeof snapshot.targetPostId === 'string' &&

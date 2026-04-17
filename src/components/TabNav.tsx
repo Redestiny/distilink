@@ -18,7 +18,7 @@ export default function TabNav() {
 
   const handleTabClick = (tabId: string) => {
     clearPostListRestoreState()
-    router.push(`/?tab=${tabId}`)
+    router.push(tabId === 'realtime' ? '/' : `/?tab=${tabId}`)
   }
 
   return (

@@ -1,13 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/db'
 import { posts, comments, agents } from '@/db/schema'
-import { eq, desc, and } from 'drizzle-orm'
+import { eq, desc, and, count, inArray } from 'drizzle-orm'
 import { verifyJWT } from '@/lib/auth'
 
 export const dynamic = 'force-dynamic'
 
+const DASHBOARD_FEED_PAGE_SIZE = 5
+
 export async function GET(request: NextRequest) {
   try {
+    const { searchParams } = new URL(request.url)
+    const requestedPage = Number.parseInt(searchParams.get('page') || '1', 10)
+    const safeRequestedPage = Number.isNaN(requestedPage) || requestedPage < 1 ? 1 : requestedPage
+
     const token = request.cookies.get('auth_token')?.value
     if (!token) {
       return NextResponse.json({ error: '未登录' }, { status: 401 })
@@ -24,6 +30,17 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Agent 不存在' }, { status: 404 })
     }
 
+    const totalPostsResult = await db
+      .select({ count: count() })
+      .from(posts)
+      .where(eq(posts.agentId, agent.agentId))
+      .get()
+
+    const total = totalPostsResult?.count || 0
+    const totalPages = total === 0 ? 0 : Math.ceil(total / DASHBOARD_FEED_PAGE_SIZE)
+    const page = totalPages === 0 ? 1 : Math.min(safeRequestedPage, totalPages)
+    const offset = (page - 1) * DASHBOARD_FEED_PAGE_SIZE
+
     // Get agent's posts
     const agentPosts = await db
       .select({
@@ -35,7 +52,8 @@ export async function GET(request: NextRequest) {
       .from(posts)
       .where(eq(posts.agentId, agent.agentId))
       .orderBy(desc(posts.createdAt))
-      .limit(50)
+      .limit(DASHBOARD_FEED_PAGE_SIZE)
+      .offset(offset)
       .all()
 
     // Get comments on agent's posts
@@ -49,7 +67,10 @@ export async function GET(request: NextRequest) {
             createdAt: comments.createdAt,
           })
           .from(comments)
-          .where(eq(comments.agentId, agent.agentId))
+          .where(and(
+            eq(comments.agentId, agent.agentId),
+            inArray(comments.postId, postIds)
+          ))
           .orderBy(desc(comments.createdAt))
           .all()
       : []
@@ -57,14 +78,14 @@ export async function GET(request: NextRequest) {
     // Get total comment count for each post
     const postsWithCounts = await Promise.all(agentPosts.map(async (post) => {
       const commentCountResult = await db
-        .select()
+        .select({ count: count() })
         .from(comments)
         .where(eq(comments.postId, post.postId))
-        .all()
+        .get()
 
       return {
         ...post,
-        commentCount: commentCountResult.length,
+        commentCount: commentCountResult?.count || 0,
         comments: agentComments.filter((c) => c.postId === post.postId),
       }
     }))
@@ -75,6 +96,10 @@ export async function GET(request: NextRequest) {
         name: agent.name,
       },
       posts: postsWithCounts,
+      page,
+      pageSize: DASHBOARD_FEED_PAGE_SIZE,
+      total,
+      totalPages,
     })
   } catch (error) {
     console.error('Dashboard feed error:', error)
