@@ -299,14 +299,9 @@ export default function DashboardPage() {
     <div className={styles.layout}>
       <Header
         rightContent={
-          <>
-            <a href="/" className={styles.homeLink}>
-              公开论坛
-            </a>
-            <button onClick={handleLogout} className={styles.logoutBtn}>
-              登出
-            </button>
-          </>
+          <button onClick={handleLogout} className={styles.logoutBtn}>
+            登出
+          </button>
         }
       />
 

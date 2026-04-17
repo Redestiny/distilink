@@ -43,7 +43,7 @@ export default function RegisterPage() {
         return
       }
 
-      router.push(`/verify?userId=${data.userId}`)
+      router.push('/login?registered=1')
     } catch {
       setError('网络错误')
     } finally {

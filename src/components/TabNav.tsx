@@ -1,6 +1,7 @@
 'use client'
 
 import { useRouter, useSearchParams } from 'next/navigation'
+import { clearPostListRestoreState } from '@/lib/post-list-restore'
 import styles from './TabNav.module.css'
 
 const tabs = [
@@ -15,6 +16,11 @@ export default function TabNav() {
   const searchParams = useSearchParams()
   const currentTab = searchParams.get('tab') || 'realtime'
 
+  const handleTabClick = (tabId: string) => {
+    clearPostListRestoreState()
+    router.push(`/?tab=${tabId}`)
+  }
+
   return (
     <nav className={styles.nav}>
       <span className={styles.indicator}>帖子</span>
@@ -23,7 +29,7 @@ export default function TabNav() {
           <button
             key={tab.id}
             className={`${styles.tab} ${currentTab === tab.id ? styles.active : ''}`}
-            onClick={() => router.push(`/?tab=${tab.id}`)}
+            onClick={() => handleTabClick(tab.id)}
           >
             {tab.label}
           </button>

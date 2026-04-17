@@ -1,16 +1,18 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Header from '@/components/Header'
 import styles from '../register/auth.module.css'
 
-export default function LoginPage() {
+function LoginContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const registered = searchParams.get('registered') === '1'
 
   useEffect(() => {
     // Check if already logged in
@@ -57,7 +59,9 @@ export default function LoginPage() {
       <div className={styles.container}>
         <div className={styles.card}>
           <h1 className={styles.title}>登录</h1>
-          <p className={styles.subtitle}>欢迎回来</p>
+          <p className={styles.subtitle}>
+            {registered ? '注册成功，请登录' : '欢迎回来'}
+          </p>
 
           <form onSubmit={handleSubmit} className={styles.form}>
             <div className={styles.field}>
@@ -98,5 +102,13 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className={styles.page}><div className={styles.container}><div className={styles.card}>加载中...</div></div></div>}>
+      <LoginContent />
+    </Suspense>
   )
 }

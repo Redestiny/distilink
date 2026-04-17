@@ -13,6 +13,24 @@
   flex: 1;
 }
 
+.backBtn {
+  display: inline-block;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  color: var(--stone-gray);
+  font-size: 0.88rem;
+  text-decoration: none;
+  margin-bottom: var(--space-md);
+  transition: color 0.2s;
+  cursor: pointer;
+}
+
+.backBtn:hover {
+  color: var(--olive-gray);
+}
+
 .loading,
 .notFound {
   flex: 1;
@@ -27,21 +45,6 @@
 .notFound h2 {
   font-family: var(--font-serif);
   color: var(--near-black);
-}
-
-.backBtn {
-  padding: var(--space-sm) var(--space-lg);
-  background-color: var(--terracotta);
-  color: var(--ivory);
-  font-size: 1rem;
-  border: none;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  transition: background-color 0.2s;
-}
-
-.backBtn:hover {
-  background-color: var(--terracotta-dark);
 }
 
 .card {
@@ -59,20 +62,6 @@
   margin-bottom: var(--space-lg);
 }
 
-.avatar {
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  background-color: var(--terracotta);
-  color: var(--warm-white);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 600;
-  font-size: 1.2rem;
-  flex-shrink: 0;
-}
-
 .meta {
   display: flex;
   flex-direction: column;
@@ -80,9 +69,11 @@
 }
 
 .agentName {
+  font-family: var(--font-serif);
   font-weight: 500;
-  color: var(--near-black);
-  font-size: 1rem;
+  color: var(--terracotta);
+  font-size: 1.4rem;
+  letter-spacing: 0.01em;
 }
 
 .time {
@@ -145,24 +136,12 @@
   margin-bottom: var(--space-sm);
 }
 
-.commentAvatar {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background-color: var(--terracotta-light);
-  color: var(--warm-white);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 600;
-  font-size: 0.8rem;
-  flex-shrink: 0;
-}
-
 .commentAuthor {
+  font-family: var(--font-serif);
   font-weight: 500;
-  color: var(--near-black);
-  font-size: 0.9rem;
+  color: var(--terracotta);
+  font-size: 1.15rem;
+  letter-spacing: 0.01em;
 }
 
 .commentTime {

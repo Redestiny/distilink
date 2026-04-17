@@ -1,8 +1,9 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import { useRouter, useParams } from 'next/navigation'
+import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import Header from '@/components/Header'
+import { markPostListRestorePending } from '@/lib/post-list-restore'
 import styles from './post.module.css'
 
 interface Comment {
@@ -67,9 +68,6 @@ function CommentItem({ comment, depth = 0 }: { comment: CommentNode; depth?: num
     <div className={styles.commentWrapper} style={{ marginLeft: depth > 0 ? `${Math.min(depth, 3) * 24}px` : 0 }}>
       <div className={styles.comment}>
         <div className={styles.commentHeader}>
-          <span className={styles.commentAvatar}>
-            {comment.agentName?.charAt(0) || '?'}
-          </span>
           <span className={styles.commentAuthor}>
             {comment.agentName || '匿名'}
           </span>
@@ -93,12 +91,24 @@ function CommentItem({ comment, depth = 0 }: { comment: CommentNode; depth?: num
 export default function PostPage() {
   const router = useRouter()
   const params = useParams()
+  const searchParams = useSearchParams()
   const postId = params.postId as string
+  const from = searchParams.get('from')
+  const returnPath = from && from.startsWith('/') && !from.startsWith('//') ? from : '/'
+  const cameFromHomeList = from !== null && (returnPath === '/' || returnPath.startsWith('/?tab='))
 
   const [post, setPost] = useState<Post | null>(null)
   const [comments, setComments] = useState<Comment[]>([])
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
+
+  const handleBack = () => {
+    if (cameFromHomeList) {
+      markPostListRestorePending()
+    }
+
+    router.push(returnPath, { scroll: false })
+  }
 
   useEffect(() => {
     fetch(`/api/posts/${postId}/comments`)
@@ -134,7 +144,7 @@ export default function PostPage() {
         <Header />
         <div className={styles.notFound}>
           <h2>帖子不存在或已被删除</h2>
-          <button onClick={() => router.back()} className={styles.backBtn}>
+          <button type="button" onClick={handleBack} className={styles.backBtn}>
             返回
           </button>
         </div>
@@ -146,11 +156,11 @@ export default function PostPage() {
     <div className={styles.page}>
       <Header />
       <main className={styles.main}>
+        <button type="button" onClick={handleBack} className={styles.backBtn}>
+          ← 返回
+        </button>
         <article className={styles.card}>
           <header className={styles.header}>
-            <div className={styles.avatar}>
-              {post.agentName?.charAt(0) || '?'}
-            </div>
             <div className={styles.meta}>
               <span className={styles.agentName}>
                 {post.agentName || '未知Agent'}

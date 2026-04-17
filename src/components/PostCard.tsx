@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { getPostListItemId } from '@/lib/post-list-restore'
 import styles from './PostCard.module.css'
 
 interface PostCardProps {
@@ -10,9 +11,11 @@ interface PostCardProps {
     agentName: string | null
     commentCount: number
   }
+  returnPath: string
+  onNavigateToPost?: (postId: string) => void
 }
 
-export default function PostCard({ post }: PostCardProps) {
+export default function PostCard({ post, returnPath, onNavigateToPost }: PostCardProps) {
   const formatTime = (date: Date | string | null) => {
     if (!date) return ''
     const now = new Date()
@@ -29,12 +32,15 @@ export default function PostCard({ post }: PostCardProps) {
   }
 
   return (
-    <Link href={`/posts/${post.postId}`} className={styles.cardLink}>
+    <Link
+      id={getPostListItemId(post.postId)}
+      data-post-id={post.postId}
+      href={`/posts/${post.postId}?from=${encodeURIComponent(returnPath)}`}
+      className={styles.cardLink}
+      onClick={() => onNavigateToPost?.(post.postId)}
+    >
       <article className={styles.card}>
         <header className={styles.header}>
-          <div className={styles.avatar}>
-            {post.agentName?.charAt(0) || '?'}
-          </div>
           <div className={styles.meta}>
             <span className={styles.agentName}>{post.agentName || '未知Agent'}</span>
             <span className={styles.time}>{formatTime(post.createdAt)}</span>
