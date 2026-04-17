@@ -13,6 +13,7 @@ import {
   savePostListSnapshot,
   type PostListSnapshot,
 } from '@/lib/post-list-restore'
+import { normalizeHomeTab, normalizeTopRange, type HomeTab, type TopRange } from '@/lib/post-tabs'
 import styles from './page.module.css'
 
 interface Post {
@@ -56,13 +57,18 @@ function isCanonicalPageParam(pageParam: string | null, page: number) {
   return pageParam === String(page)
 }
 
-function buildHomePageHref(tab: string, page: number, currentSearch: string) {
+function buildHomePageHref(tab: HomeTab, topRange: TopRange, page: number, currentSearch: string) {
   const params = new URLSearchParams(currentSearch)
+  params.delete('topRange')
 
   if (tab === 'realtime') {
     params.delete('tab')
   } else {
     params.set('tab', tab)
+  }
+
+  if (tab === 'top' && topRange !== 'all') {
+    params.set('topRange', topRange)
   }
 
   if (page <= 1) {
@@ -75,12 +81,23 @@ function buildHomePageHref(tab: string, page: number, currentSearch: string) {
   return query ? `/?${query}` : '/'
 }
 
+function isCanonicalTopRangeParam(tab: HomeTab, topRangeParam: string | null, topRange: TopRange) {
+  if (tab !== 'top' || topRange === 'all') {
+    return topRangeParam === null
+  }
+
+  return topRangeParam === topRange
+}
+
 function HomeContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const currentSearch = searchParams.toString()
   const pageParam = searchParams.get('page')
-  const tab = searchParams.get('tab') || 'realtime'
+  const rawTab = searchParams.get('tab')
+  const rawTopRange = searchParams.get('topRange')
+  const tab = normalizeHomeTab(rawTab)
+  const topRange = tab === 'top' ? normalizeTopRange(rawTopRange) : 'all'
   const currentPage = parsePageParam(pageParam)
   const [posts, setPosts] = useState<Post[]>([])
   const [loading, setLoading] = useState(true)
@@ -96,7 +113,7 @@ function HomeContent() {
   const hasAppliedRestoreRef = useRef(false)
   const pendingScrollPageRef = useRef<number | null>(null)
   const feedRef = useRef<HTMLDivElement | null>(null)
-  const returnPath = buildHomePageHref(tab, pagination.page || currentPage, currentSearch)
+  const returnPath = buildHomePageHref(tab, topRange, pagination.page || currentPage, currentSearch)
 
   useLayoutEffect(() => {
     hasAppliedRestoreRef.current = false
@@ -104,7 +121,14 @@ function HomeContent() {
     const snapshot = readPostListSnapshot<Post>()
     const hasPendingRestore = isPostListRestorePending()
 
-    if (hasPendingRestore && snapshot && snapshot.tab === tab && snapshot.page === currentPage) {
+    const snapshotTopRange = snapshot?.topRange || 'all'
+    if (
+      hasPendingRestore &&
+      snapshot &&
+      snapshot.tab === tab &&
+      snapshotTopRange === topRange &&
+      snapshot.page === currentPage
+    ) {
       restoredFromSnapshotRef.current = true
       setPosts(snapshot.posts)
       setPagination({
@@ -134,7 +158,7 @@ function HomeContent() {
     setLoading(true)
     setRestoreSnapshot(null)
     setIsBootstrapping(false)
-  }, [currentPage, tab])
+  }, [currentPage, tab, topRange])
 
   useEffect(() => {
     if (isBootstrapping || restoredFromSnapshotRef.current) return
@@ -142,7 +166,14 @@ function HomeContent() {
     let isMounted = true
     setLoading(true)
 
-    fetch(`/api/posts?tab=${tab}&page=${currentPage}`)
+    const params = new URLSearchParams()
+    params.set('tab', tab)
+    params.set('page', String(currentPage))
+    if (tab === 'top') {
+      params.set('topRange', topRange)
+    }
+
+    fetch(`/api/posts?${params.toString()}`)
       .then((res) => res.json())
       .then((data: PostsResponse) => {
         if (!isMounted) return
@@ -155,8 +186,19 @@ function HomeContent() {
         })
 
         const serverPage = data.page || 1
-        if (serverPage !== currentPage || !isCanonicalPageParam(pageParam, serverPage)) {
-          router.replace(buildHomePageHref(tab, serverPage, currentSearch), { scroll: false })
+        const canonicalHref = buildHomePageHref(tab, topRange, serverPage, currentSearch)
+        const isCanonicalTabParam =
+          (tab === 'realtime' && rawTab === null) ||
+          (tab === 'random' && rawTab === 'random') ||
+          (tab === 'top' && rawTab === 'top')
+
+        if (
+          serverPage !== currentPage ||
+          !isCanonicalPageParam(pageParam, serverPage) ||
+          !isCanonicalTabParam ||
+          !isCanonicalTopRangeParam(tab, rawTopRange, topRange)
+        ) {
+          router.replace(canonicalHref, { scroll: false })
         }
       })
       .catch(console.error)
@@ -168,7 +210,7 @@ function HomeContent() {
     return () => {
       isMounted = false
     }
-  }, [currentPage, currentSearch, isBootstrapping, pageParam, router, tab])
+  }, [currentPage, currentSearch, isBootstrapping, pageParam, rawTab, rawTopRange, router, tab, topRange])
 
   useEffect(() => {
     if (loading || pendingScrollPageRef.current === null || pendingScrollPageRef.current !== pagination.page) {
@@ -240,6 +282,7 @@ function HomeContent() {
   const handleNavigateToPost = (postId: string) => {
     const snapshot: HomePostListSnapshot = {
       tab,
+      topRange,
       posts,
       page: pagination.page,
       pageSize: pagination.pageSize,
@@ -260,7 +303,7 @@ function HomeContent() {
     }
 
     pendingScrollPageRef.current = nextPage
-    router.push(buildHomePageHref(tab, nextPage, currentSearch), { scroll: false })
+    router.push(buildHomePageHref(tab, topRange, nextPage, currentSearch), { scroll: false })
   }
 
   return (

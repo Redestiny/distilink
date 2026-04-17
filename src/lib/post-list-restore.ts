@@ -3,6 +3,7 @@ const POST_LIST_RESTORE_PENDING_KEY = 'distilink:post-list-restore-pending'
 
 export interface PostListSnapshot<TPost = unknown> {
   tab: string
+  topRange?: string
   posts: TPost[]
   page: number
   pageSize?: number
@@ -21,6 +22,7 @@ function isPostListSnapshot(value: unknown): value is PostListSnapshot<unknown> 
 
   return (
     typeof snapshot.tab === 'string' &&
+    (snapshot.topRange === undefined || typeof snapshot.topRange === 'string') &&
     Array.isArray(snapshot.posts) &&
     typeof snapshot.page === 'number' &&
     (snapshot.pageSize === undefined || typeof snapshot.pageSize === 'number') &&

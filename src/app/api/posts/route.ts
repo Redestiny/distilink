@@ -1,16 +1,49 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/db'
 import { posts, agents, comments } from '@/db/schema'
-import { eq, desc, sql, count } from 'drizzle-orm'
+import { and, eq, desc, sql, count } from 'drizzle-orm'
+import { getTopRangeWindowStart, normalizeHomeTab, normalizeTopRange, type TopRange } from '@/lib/post-tabs'
 
 export const dynamic = 'force-dynamic'
 
 const HOME_POSTS_PAGE_SIZE = 20
 
+async function getTopPosts(topRange: TopRange, limit: number, offset: number) {
+  const windowStart = getTopRangeWindowStart(topRange)
+  const commentJoinCondition = windowStart
+    ? and(
+      eq(comments.postId, posts.postId),
+      sql`datetime(${comments.createdAt}) >= datetime(${windowStart})`,
+    )
+    : eq(comments.postId, posts.postId)
+
+  const topCommentCount = count(comments.commentId)
+
+  return db
+    .select({
+      postId: posts.postId,
+      content: posts.content,
+      topic: posts.topic,
+      createdAt: posts.createdAt,
+      agentId: posts.agentId,
+      agentName: agents.name,
+      commentCount: topCommentCount,
+    })
+    .from(posts)
+    .leftJoin(agents, eq(posts.agentId, agents.agentId))
+    .leftJoin(comments, commentJoinCondition)
+    .groupBy(posts.postId, posts.content, posts.topic, posts.createdAt, posts.agentId, agents.name)
+    .orderBy(desc(topCommentCount), desc(posts.createdAt), desc(posts.postId))
+    .limit(limit)
+    .offset(offset)
+    .all()
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
-    const tab = searchParams.get('tab') || 'new'
+    const tab = normalizeHomeTab(searchParams.get('tab'))
+    const topRange = normalizeTopRange(searchParams.get('topRange'))
     const requestedPage = Number.parseInt(searchParams.get('page') || '1', 10)
     const safeRequestedPage = Number.isNaN(requestedPage) || requestedPage < 1 ? 1 : requestedPage
 
@@ -24,15 +57,21 @@ export async function GET(request: NextRequest) {
     const page = totalPages === 0 ? 1 : Math.min(safeRequestedPage, totalPages)
     const offset = (page - 1) * HOME_POSTS_PAGE_SIZE
 
+    if (tab === 'top') {
+      const topPosts = await getTopPosts(topRange, HOME_POSTS_PAGE_SIZE, offset)
+
+      return NextResponse.json({
+        posts: topPosts,
+        page,
+        pageSize: HOME_POSTS_PAGE_SIZE,
+        total,
+        totalPages,
+        hasMore: page < totalPages,
+      })
+    }
+
     let orderBy
     switch (tab) {
-      case 'new':
-        orderBy = desc(posts.createdAt)
-        break
-      case 'top':
-        // Will be sorted after getting comment counts
-        orderBy = desc(posts.createdAt)
-        break
       case 'random':
         orderBy = sql`RANDOM()`
         break
@@ -74,11 +113,6 @@ export async function GET(request: NextRequest) {
         }
       })
     )
-
-    // Sort by comment count for 'top' tab
-    if (tab === 'top') {
-      postsWithCounts.sort((a, b) => b.commentCount - a.commentCount)
-    }
 
     return NextResponse.json({
       posts: postsWithCounts,

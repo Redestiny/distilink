@@ -2,14 +2,32 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: var(--space-md);
   background-color: var(--warm-sand);
   padding: var(--space-sm);
   border-radius: var(--radius-sm);
 }
 
+.tabGroups {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+
 .tabs {
   display: flex;
   gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+.subTabs {
+  padding: 3px;
+  gap: 3px;
+  background-color: rgba(250, 249, 245, 0.48);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--ring-warm);
 }
 
 .tab {
@@ -23,6 +41,11 @@
   cursor: pointer;
   transition: all 0.2s;
   text-align: center;
+}
+
+.subTab {
+  padding: 6px var(--space-md);
+  font-size: 0.88rem;
 }
 
 .tab:hover {
@@ -43,4 +66,17 @@
   padding-left: var(--space-sm);
   letter-spacing: 0.12px;
   text-transform: uppercase;
+  flex: 0 0 auto;
+}
+
+@media (max-width: 640px) {
+  .nav {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .tabGroups {
+    justify-content: flex-start;
+    width: 100%;
+  }
 }

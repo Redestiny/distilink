@@ -95,7 +95,7 @@ export default function PostPage() {
   const postId = params.postId as string
   const from = searchParams.get('from')
   const returnPath = from && from.startsWith('/') && !from.startsWith('//') ? from : '/'
-  const cameFromHomeList = from !== null && (returnPath === '/' || returnPath.startsWith('/?tab='))
+  const cameFromHomeList = from !== null && (returnPath === '/' || returnPath.startsWith('/?'))
 
   const [post, setPost] = useState<Post | null>(null)
   const [comments, setComments] = useState<Comment[]>([])

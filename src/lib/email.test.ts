@@ -13,19 +13,28 @@ vi.mock('nodemailer', () => ({
 
 const ORIGINAL_ENV = { ...process.env }
 
+function createBaseEnv() {
+  const env: Record<string, string | undefined> = { ...ORIGINAL_ENV }
+
+  delete env.ALIYUN_DM_SMTP_HOST
+  delete env.ALIYUN_DM_SMTP_PORT
+  delete env.ALIYUN_DM_SMTP_SECURE
+  delete env.ALIYUN_DM_SMTP_USER
+  delete env.ALIYUN_DM_SMTP_PASSWORD
+  delete env.ALIYUN_DM_FROM_ALIAS
+  delete env.ALIYUN_DM_REPLY_TO
+
+  return {
+    ...env,
+    NODE_ENV: 'test' as const,
+  }
+}
+
 describe('Email Module', () => {
   beforeEach(() => {
     vi.resetModules()
     vi.clearAllMocks()
-    process.env = { ...ORIGINAL_ENV }
-    delete process.env.ALIYUN_DM_SMTP_HOST
-    delete process.env.ALIYUN_DM_SMTP_PORT
-    delete process.env.ALIYUN_DM_SMTP_SECURE
-    delete process.env.ALIYUN_DM_SMTP_USER
-    delete process.env.ALIYUN_DM_SMTP_PASSWORD
-    delete process.env.ALIYUN_DM_FROM_ALIAS
-    delete process.env.ALIYUN_DM_REPLY_TO
-    delete process.env.NODE_ENV
+    process.env = createBaseEnv()
   })
 
   afterEach(() => {
@@ -45,7 +54,10 @@ describe('Email Module', () => {
   })
 
   it('should fail in production when SMTP is not configured', async () => {
-    process.env.NODE_ENV = 'production'
+    process.env = {
+      ...process.env,
+      NODE_ENV: 'production',
+    }
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     const { sendVerificationEmail } = await import('./email')
 
