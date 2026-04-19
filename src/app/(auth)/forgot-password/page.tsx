@@ -1,27 +1,22 @@
 'use client'
 
-import { useState, useEffect, Suspense } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import Header from '@/components/Header'
 import styles from '../register/auth.module.css'
 
-function LoginContent() {
+export default function ForgotPasswordPage() {
   const router = useRouter()
-  const searchParams = useSearchParams()
   const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const registered = searchParams.get('registered') === '1'
-  const redirectPath = searchParams.get('redirect') || '/dashboard'
 
   useEffect(() => {
-    // Check if already logged in
     fetch('/api/auth/me')
       .then(res => res.json())
       .then(data => {
         if (data.user) {
-          router.push(redirectPath)
+          router.push('/dashboard')
         }
       })
       .catch(() => {})
@@ -33,20 +28,20 @@ function LoginContent() {
     setLoading(true)
 
     try {
-      const res = await fetch('/api/auth/login', {
+      const res = await fetch('/api/auth/forgot-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email }),
       })
 
       const data = await res.json()
 
       if (!res.ok) {
-        setError(data.error || '登录失败')
+        setError(data.error || '请求失败')
         return
       }
 
-      router.push(redirectPath)
+      router.push(`/reset-password?email=${encodeURIComponent(email)}`)
     } catch {
       setError('网络错误')
     } finally {
@@ -59,10 +54,8 @@ function LoginContent() {
       <Header />
       <div className={styles.container}>
         <div className={styles.card}>
-          <h1 className={styles.title}>登录</h1>
-          <p className={styles.subtitle}>
-            {registered ? '注册成功，请登录' : '欢迎回来'}
-          </p>
+          <h1 className={styles.title}>忘记密码</h1>
+          <p className={styles.subtitle}>输入邮箱，我们将发送验证码</p>
 
           <form onSubmit={handleSubmit} className={styles.form}>
             <div className={styles.field}>
@@ -77,39 +70,18 @@ function LoginContent() {
               />
             </div>
 
-            <div className={styles.field}>
-              <label htmlFor="password">密码</label>
-              <input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="输入密码"
-                autoComplete="current-password"
-                required
-              />
-            </div>
-
             {error && <div className={styles.error}>{error}</div>}
 
             <button type="submit" className={styles.button} disabled={loading}>
-              {loading ? '登录中...' : '登录'}
+              {loading ? '发送中...' : '发送验证码'}
             </button>
           </form>
 
           <div className={styles.footer}>
-            <a href="/register">立即注册</a> · <a href="/forgot-password">忘记密码</a>
+            想起密码了？<a href="/login">登录</a>
           </div>
         </div>
       </div>
     </div>
-  )
-}
-
-export default function LoginPage() {
-  return (
-    <Suspense fallback={<div className={styles.page}><div className={styles.container}><div className={styles.card}>加载中...</div></div></div>}>
-      <LoginContent />
-    </Suspense>
   )
 }
