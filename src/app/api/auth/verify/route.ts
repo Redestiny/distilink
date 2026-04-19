@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/db'
-import { users } from '@/db/schema'
+import { users, pendingUsers } from '@/db/schema'
 import { eq } from 'drizzle-orm'
 import { generateJWT, isCodeExpired } from '@/lib/auth'
 
 export const dynamic = 'force-dynamic'
+
+function isUniqueConstraintError(error: unknown): boolean {
+  return error instanceof Error && error.message.toLowerCase().includes('unique')
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -14,35 +18,43 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '参数不完整' }, { status: 400 })
     }
 
-    const user = await db.select().from(users).where(eq(users.userId, userId)).get()
-    if (!user) {
-      return NextResponse.json({ error: '用户不存在' }, { status: 404 })
+    // Look up pending user
+    const pendingUser = await db.select().from(pendingUsers).where(eq(pendingUsers.userId, userId)).get()
+    if (!pendingUser) {
+      return NextResponse.json({ error: '用户不存在或已验证' }, { status: 404 })
     }
 
-    if (user.emailVerified) {
-      return NextResponse.json({ error: '邮箱已验证' }, { status: 400 })
-    }
-
-    if (isCodeExpired(user.codeExpiry)) {
+    if (isCodeExpired(pendingUser.codeExpiry)) {
+      await db.delete(pendingUsers).where(eq(pendingUsers.userId, userId)).run()
       return NextResponse.json({ error: '验证码已过期' }, { status: 400 })
     }
 
-    if (user.verificationCode !== code) {
+    if (pendingUser.verificationCode !== code) {
       return NextResponse.json({ error: '验证码错误' }, { status: 400 })
     }
 
-    // Mark as verified and clear code
-    db.update(users)
-      .set({
-        emailVerified: true,
-        verificationCode: null,
-        codeExpiry: null,
-      })
-      .where(eq(users.userId, userId))
-      .run()
+    try {
+      await db.transaction(async (tx) => {
+        await tx.insert(users).values({
+          userId,
+          email: pendingUser.email,
+          passwordHash: pendingUser.passwordHash,
+          emailVerified: true,
+        }).run()
 
-    // Auto-login: set JWT cookie after successful verification
-    const token = generateJWT({ userId, email: user.email })
+        await tx.delete(pendingUsers).where(eq(pendingUsers.userId, userId)).run()
+      })
+    } catch (error) {
+      if (isUniqueConstraintError(error)) {
+        await db.delete(pendingUsers).where(eq(pendingUsers.userId, userId)).run()
+        return NextResponse.json({ error: '该邮箱已注册' }, { status: 409 })
+      }
+
+      throw error
+    }
+
+    // Auto-login: set JWT cookie
+    const token = generateJWT({ userId, email: pendingUser.email })
     const isProd = process.env.NODE_ENV === 'production'
     const response = NextResponse.json({ message: '验证成功' })
     response.cookies.set('auth_token', token, {

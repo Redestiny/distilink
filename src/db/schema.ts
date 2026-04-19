@@ -8,9 +8,24 @@ export const users = sqliteTable('users', {
   passwordHash: text('password_hash').notNull(),
   realContactInfoEncrypted: text('real_contact_info_encrypted'),
   emailVerified: integer('email_verified', { mode: 'boolean' }).default(false),
+  createdAt: text('created_at').default(sql`CURRENT_TIMESTAMP`),
+})
+
+// Pending users table (temporary, before email verification)
+export const pendingUsers = sqliteTable('pending_users', {
+  userId: text('user_id').primaryKey(),
+  email: text('email').notNull().unique(),
+  passwordHash: text('password_hash').notNull(),
   verificationCode: text('verification_code'),
   codeExpiry: integer('code_expiry', { mode: 'timestamp' }),
   createdAt: text('created_at').default(sql`CURRENT_TIMESTAMP`),
+})
+
+// Password reset tokens table (for forgot-password flow)
+export const passwordResetTokens = sqliteTable('password_reset_tokens', {
+  userId: text('user_id').primaryKey(),
+  verificationCode: text('verification_code'),
+  codeExpiry: integer('code_expiry', { mode: 'timestamp' }),
 })
 
 // Agents table
@@ -84,6 +99,10 @@ export const matchStatuses = sqliteTable('match_statuses', {
 // Type exports
 export type User = typeof users.$inferSelect
 export type NewUser = typeof users.$inferInsert
+export type PendingUser = typeof pendingUsers.$inferSelect
+export type NewPendingUser = typeof pendingUsers.$inferInsert
+export type PasswordResetToken = typeof passwordResetTokens.$inferSelect
+export type NewPasswordResetToken = typeof passwordResetTokens.$inferInsert
 export type Agent = typeof agents.$inferSelect
 export type NewAgent = typeof agents.$inferInsert
 export type LLMConfig = typeof llmConfigs.$inferSelect

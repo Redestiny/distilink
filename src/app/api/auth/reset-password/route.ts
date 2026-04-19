@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/db'
-import { users } from '@/db/schema'
+import { users, passwordResetTokens } from '@/db/schema'
 import { eq } from 'drizzle-orm'
 import { generateJWT, hashPassword, isCodeExpired } from '@/lib/auth'
 
@@ -23,25 +23,31 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '用户不存在' }, { status: 404 })
     }
 
-    if (isCodeExpired(user.codeExpiry)) {
+    const resetToken = await db.select().from(passwordResetTokens).where(eq(passwordResetTokens.userId, user.userId)).get()
+    if (!resetToken) {
+      return NextResponse.json({ error: '请先请求验证码' }, { status: 400 })
+    }
+
+    if (isCodeExpired(resetToken.codeExpiry)) {
+      // Clean up expired token
+      await db.delete(passwordResetTokens).where(eq(passwordResetTokens.userId, user.userId)).run()
       return NextResponse.json({ error: '验证码已过期' }, { status: 400 })
     }
 
-    if (user.verificationCode !== code) {
+    if (resetToken.verificationCode !== code) {
       return NextResponse.json({ error: '验证码错误' }, { status: 400 })
     }
 
     const passwordHash = await hashPassword(newPassword)
 
-    await db
-      .update(users)
-      .set({
-        passwordHash,
-        verificationCode: null,
-        codeExpiry: null,
-      })
-      .where(eq(users.userId, user.userId))
-      .run()
+    await db.transaction(async (tx) => {
+      await tx.update(users)
+        .set({ passwordHash })
+        .where(eq(users.userId, user.userId))
+        .run()
+
+      await tx.delete(passwordResetTokens).where(eq(passwordResetTokens.userId, user.userId)).run()
+    })
 
     // Auto-login: set JWT cookie
     const token = generateJWT({ userId: user.userId, email: user.email })

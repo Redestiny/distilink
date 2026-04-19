@@ -19,8 +19,10 @@ function ResetPasswordContent() {
     const e = searchParams.get('email')
     if (e) {
       setEmail(e)
+    } else {
+      router.push('/forgot-password')
     }
-  }, [searchParams])
+  }, [searchParams, router])
 
   const maskEmail = (email: string) => {
     const [local, domain] = email.split('@')
@@ -91,7 +93,6 @@ function ResetPasswordContent() {
   }
 
   if (!email) {
-    router.push('/forgot-password')
     return null
   }
 

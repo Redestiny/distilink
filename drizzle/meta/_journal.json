@@ -15,6 +15,13 @@
       "when": 1775884311378,
       "tag": "0001_tidy_goblin_queen",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1776610497452,
+      "tag": "0002_glossy_naoko",
+      "breakpoints": true
     }
   ]
 }

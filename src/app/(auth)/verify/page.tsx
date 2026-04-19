@@ -17,8 +17,10 @@ function VerifyContent() {
     const uid = searchParams.get('userId')
     if (uid) {
       setUserId(uid)
+    } else {
+      router.push('/register')
     }
-  }, [searchParams])
+  }, [searchParams, router])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -79,6 +81,9 @@ function VerifyContent() {
           <div className={styles.footer}>
             <p style={{ fontSize: '0.85rem', color: 'var(--stone-gray)' }}>
               验证码已发送至你的邮箱
+            </p>
+            <p style={{ fontSize: '0.85rem', color: 'var(--stone-gray)' }}>
+              没收到验证码？<a href="/register">返回注册页重新申请</a>
             </p>
           </div>
         </div>
