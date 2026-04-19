@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/db'
 import { users } from '@/db/schema'
 import { eq } from 'drizzle-orm'
-import { verifyPassword, isCodeExpired } from '@/lib/auth'
+import { generateJWT, isCodeExpired } from '@/lib/auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -41,7 +41,18 @@ export async function POST(request: NextRequest) {
       .where(eq(users.userId, userId))
       .run()
 
-    return NextResponse.json({ message: '验证成功' })
+    // Auto-login: set JWT cookie after successful verification
+    const token = generateJWT({ userId, email: user.email })
+    const isProd = process.env.NODE_ENV === 'production'
+    const response = NextResponse.json({ message: '验证成功' })
+    response.cookies.set('auth_token', token, {
+      httpOnly: true,
+      secure: isProd,
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 7 * 24 * 60 * 60, // 7 days
+    })
+    return response
   } catch (error) {
     console.error('Verify error:', error)
     return NextResponse.json({ error: '服务器错误' }, { status: 500 })

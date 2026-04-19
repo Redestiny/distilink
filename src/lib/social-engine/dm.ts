@@ -1,6 +1,6 @@
 import { db } from '@/db'
-import { agents, posts, comments, interactionLogs, relationshipScores } from '@/db/schema'
-import { eq, and, sql, desc } from 'drizzle-orm'
+import { agents, comments, interactionLogs, relationshipScores } from '@/db/schema'
+import { eq, and, or } from 'drizzle-orm'
 import { v4 as uuidv4 } from 'uuid'
 import { generateDM, generateScore } from './llm'
 
@@ -56,15 +56,23 @@ export async function checkAndTriggerDM() {
 
 async function runDMSession(agentAId: string, agentBId: string) {
   try {
-    // Check if DM already exists between these agents
+    // Check if DM already exists between these agents (either direction)
     const existingDM = await db
       .select()
       .from(interactionLogs)
       .where(
         and(
           eq(interactionLogs.type, 'DM'),
-          eq(interactionLogs.agentA, agentAId),
-          eq(interactionLogs.agentB, agentBId)
+          or(
+            and(
+              eq(interactionLogs.agentA, agentAId),
+              eq(interactionLogs.agentB, agentBId),
+            ),
+            and(
+              eq(interactionLogs.agentA, agentBId),
+              eq(interactionLogs.agentB, agentAId),
+            ),
+          )
         )
       )
       .limit(1)
@@ -87,8 +95,6 @@ async function runDMSession(agentAId: string, agentBId: string) {
 
     const ROUNDS = 8 // 5-10 rounds
     let conversationHistory = ''
-    let lastMessageA = ''
-    let lastMessageB = ''
 
     // Alternating DM conversation
     for (let round = 0; round < ROUNDS; round++) {
@@ -98,7 +104,6 @@ async function runDMSession(agentAId: string, agentBId: string) {
         agentBId,
         conversationHistory || `你好，很高兴认识你！`
       )
-      lastMessageA = messageA
 
       // Save to interaction log
       db.insert(interactionLogs).values({
@@ -118,7 +123,6 @@ async function runDMSession(agentAId: string, agentBId: string) {
         agentAId,
         conversationHistory
       )
-      lastMessageB = messageB
 
       db.insert(interactionLogs).values({
         actionId: uuidv4(),
@@ -133,8 +137,19 @@ async function runDMSession(agentAId: string, agentBId: string) {
     }
 
     // Both agents score each other
-    const scoreAtoB = await generateScore(agentAId, agentBId, conversationHistory)
-    const scoreBtoA = await generateScore(agentBId, agentAId, conversationHistory)
+    let scoreAtoB = 0
+    try {
+      scoreAtoB = await generateScore(agentAId, agentBId, conversationHistory)
+    } catch (error) {
+      console.error('[DM Action] Score A->B LLM call failed:', error)
+    }
+
+    let scoreBtoA = 0
+    try {
+      scoreBtoA = await generateScore(agentBId, agentAId, conversationHistory)
+    } catch (error) {
+      console.error('[DM Action] Score B->A LLM call failed:', error)
+    }
 
     console.log(`[DM Action] Scores: ${agentA.name} -> ${agentB.name}: ${scoreAtoB}, ${agentB.name} -> ${agentA.name}: ${scoreBtoA}`)
 

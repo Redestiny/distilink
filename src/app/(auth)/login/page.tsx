@@ -13,6 +13,7 @@ function LoginContent() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const registered = searchParams.get('registered') === '1'
+  const redirectPath = searchParams.get('redirect') || '/dashboard'
 
   useEffect(() => {
     // Check if already logged in
@@ -20,7 +21,7 @@ function LoginContent() {
       .then(res => res.json())
       .then(data => {
         if (data.user) {
-          router.push('/dashboard')
+          router.push(redirectPath)
         }
       })
       .catch(() => {})
@@ -45,7 +46,7 @@ function LoginContent() {
         return
       }
 
-      router.push('/dashboard')
+      router.push(redirectPath)
     } catch {
       setError('网络错误')
     } finally {
