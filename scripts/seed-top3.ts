@@ -12,7 +12,7 @@
 
 import { db } from '../src/db'
 import { agents, interactionLogs, relationshipScores } from '../src/db/schema'
-import { eq, ne, sql } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { v4 as uuidv4 } from 'uuid'
 
 async function seed() {
@@ -77,9 +77,13 @@ async function seed() {
     const existing = await db
       .select()
       .from(relationshipScores)
-      .where(eq(relationshipScores.agentA, ourAgent.agentId))
-      .all()
-      .then(results => results.find(r => r.agentB === round.agent!.agentId))
+      .where(
+        and(
+          eq(relationshipScores.agentA, ourAgent.agentId),
+          eq(relationshipScores.agentB, round.agent.agentId)
+        )
+      )
+      .get()
 
     if (existing) {
       await db.update(relationshipScores)
@@ -87,7 +91,12 @@ async function seed() {
           score: (existing.score || 0) + round.score,
           updatedAt: new Date().toISOString(),
         })
-        .where(eq(relationshipScores.agentA, ourAgent.agentId))
+        .where(
+          and(
+            eq(relationshipScores.agentA, ourAgent.agentId),
+            eq(relationshipScores.agentB, round.agent.agentId)
+          )
+        )
         .run()
     } else {
       await db.insert(relationshipScores).values({

@@ -159,6 +159,70 @@ async function ensureMatchStatusesUniqueIndex(client) {
   )
 }
 
+async function deduplicateRelationshipScores(client) {
+  if (!(await tableExists(client, 'relationship_scores'))) {
+    return
+  }
+
+  const duplicateGroups = await execute(
+    client,
+    `SELECT COUNT(*) AS count
+     FROM (
+       SELECT 1
+       FROM relationship_scores
+       GROUP BY agent_a, agent_b
+       HAVING COUNT(*) > 1
+     )`
+  )
+
+  const duplicateGroupCount = Number(duplicateGroups.rows[0]?.count ?? 0)
+  if (duplicateGroupCount === 0) {
+    return
+  }
+
+  console.log(`[DB] Deduplicating ${duplicateGroupCount} duplicate relationship_scores pair(s)`)
+
+  await client.execute('BEGIN')
+
+  try {
+    await client.execute(`
+      CREATE TEMP TABLE relationship_scores_deduped AS
+      SELECT
+        agent_a,
+        agent_b,
+        COALESCE(SUM(score), 0) AS score,
+        MAX(COALESCE(datetime(updated_at), updated_at)) AS updated_at
+      FROM relationship_scores
+      GROUP BY agent_a, agent_b
+    `)
+
+    await client.execute('DELETE FROM relationship_scores')
+
+    await client.execute(`
+      INSERT INTO relationship_scores (agent_a, agent_b, score, updated_at)
+      SELECT agent_a, agent_b, score, updated_at
+      FROM relationship_scores_deduped
+    `)
+
+    await client.execute('DROP TABLE relationship_scores_deduped')
+    await client.execute('COMMIT')
+  } catch (error) {
+    await client.execute('ROLLBACK')
+    throw error
+  }
+}
+
+async function ensureRelationshipScoresUniqueIndex(client) {
+  if (!(await tableExists(client, 'relationship_scores'))) {
+    return
+  }
+
+  await deduplicateRelationshipScores(client)
+  await client.execute(
+    'CREATE UNIQUE INDEX IF NOT EXISTS relationship_scores_agent_a_agent_b_unique ON relationship_scores (agent_a, agent_b)'
+  )
+}
+
 async function ensureCompatibility(client) {
   if (await tableExists(client, 'users')) {
     await client.execute('CREATE UNIQUE INDEX IF NOT EXISTS users_email_unique ON users (email)')
@@ -170,6 +234,7 @@ async function ensureCompatibility(client) {
   }
 
   await ensureMatchStatusesUniqueIndex(client)
+  await ensureRelationshipScoresUniqueIndex(client)
 }
 
 async function ensureMigrationsTable(client) {

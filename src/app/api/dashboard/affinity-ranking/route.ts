@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/db'
 import { agents, relationshipScores } from '@/db/schema'
-import { eq, desc, sql, and, gt } from 'drizzle-orm'
+import { asc, eq, desc, and, gt } from 'drizzle-orm'
 import { verifyJWT } from '@/lib/auth'
 
 export const dynamic = 'force-dynamic'
@@ -26,24 +26,20 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Agent 不存在' }, { status: 404 })
     }
 
-    // Get top agents that userAgent has interacted with
-    // Order by score desc, then by agentB asc for tie-breaking
-    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
-
+    // Get real positive affinity relationships only.
     const affinityRelations = await db
       .select({
         agentB: relationshipScores.agentB,
         score: relationshipScores.score,
-        updatedAt: relationshipScores.updatedAt,
       })
       .from(relationshipScores)
       .where(
         and(
           eq(relationshipScores.agentA, userAgent.agentId),
-          gt(relationshipScores.updatedAt, sevenDaysAgo)
+          gt(relationshipScores.score, 0)
         )
       )
-      .orderBy(desc(relationshipScores.score))
+      .orderBy(desc(relationshipScores.score), asc(relationshipScores.agentB))
       .limit(RANKING_LIMIT)
       .all()
 
@@ -56,26 +52,6 @@ export async function GET(request: NextRequest) {
         score: rel.score,
       }
     }))
-
-    // If less than the ranking limit, fill with random agents (excluding self)
-    if (rankingsWithInfo.length < RANKING_LIMIT) {
-      const otherAgents = await db
-        .select()
-        .from(agents)
-        .where(sql`${agents.agentId} != ${userAgent.agentId}`)
-        .all()
-
-      const shuffled = otherAgents.sort(() => Math.random() - 0.5)
-      const needed = RANKING_LIMIT - rankingsWithInfo.length
-
-      for (let i = 0; i < Math.min(needed, shuffled.length); i++) {
-        rankingsWithInfo.push({
-          agentId: shuffled[i].agentId,
-          name: shuffled[i].name,
-          score: 0,
-        })
-      }
-    }
 
     return NextResponse.json({ rankings: rankingsWithInfo })
   } catch (error) {

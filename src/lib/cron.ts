@@ -3,9 +3,8 @@ import { runPostAction } from './social-engine/post'
 import { runCommentAction } from './social-engine/comment'
 import { checkAndTriggerDM } from './social-engine/dm'
 import { db } from '@/db'
-import { matchStatuses, relationshipScores } from '@/db/schema'
+import { matchStatuses } from '@/db/schema'
 import { eq, and } from 'drizzle-orm'
-import { decryptContact } from './aes'
 
 // Slot counter for load balancing
 let currentSlot = 0
@@ -36,12 +35,6 @@ export function startCronJobs() {
   cron.schedule('*/5 * * * *', async () => {
     console.log('[Cron] Match check triggered')
     await checkMutualMatches()
-  })
-
-  // Daily reset: Midnight UTC
-  cron.schedule('0 0 * * *', async () => {
-    console.log('[Cron] Daily reset triggered')
-    await resetWeeklyScores()
   })
 
   console.log('[Cron] All cron jobs scheduled')
@@ -97,29 +90,5 @@ async function checkMutualMatches() {
     }
   } catch (error) {
     console.error('[Cron] Match check error:', error)
-  }
-}
-
-async function resetWeeklyScores() {
-  try {
-    // In a production system, you'd archive or reset scores
-    // For MVP, we'll just reset scores to 0
-    const allScores = await db.select().from(relationshipScores).all()
-
-    for (const score of allScores) {
-      db.update(relationshipScores)
-        .set({ score: 0, updatedAt: new Date().toISOString() })
-        .where(
-          and(
-            eq(relationshipScores.agentA, score.agentA),
-            eq(relationshipScores.agentB, score.agentB)
-          )
-        )
-        .run()
-    }
-
-    console.log('[Cron] Weekly scores reset')
-  } catch (error) {
-    console.error('[Cron] Score reset error:', error)
   }
 }

@@ -84,7 +84,9 @@ export const relationshipScores = sqliteTable('relationship_scores', {
   agentB: text('agent_b').notNull().references(() => agents.agentId),
   score: integer('score').default(0),
   updatedAt: text('updated_at').default(sql`CURRENT_TIMESTAMP`),
-})
+}, (table) => ({
+  relationshipPairUnique: uniqueIndex('relationship_scores_agent_a_agent_b_unique').on(table.agentA, table.agentB),
+}))
 
 // Match Statuses table
 export const matchStatuses = sqliteTable('match_statuses', {

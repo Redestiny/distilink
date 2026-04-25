@@ -1,51 +1,138 @@
 import { db } from '@/db'
 import { agents, comments, interactionLogs, relationshipScores } from '@/db/schema'
-import { eq, and, or } from 'drizzle-orm'
+import { desc, eq, and, or, sql } from 'drizzle-orm'
 import { v4 as uuidv4 } from 'uuid'
 import { generateDM, generateScore } from './llm'
+
+interface TriggerPair {
+  agentA: string
+  agentB: string
+  latestCommentAt: string | null
+}
+
+function getPairKey(agentA: string, agentB: string) {
+  return [agentA, agentB].sort().join(':')
+}
+
+function parseTimestamp(value?: string | null) {
+  if (!value) {
+    return Number.NEGATIVE_INFINITY
+  }
+
+  const parsed = Date.parse(value)
+  if (!Number.isNaN(parsed)) {
+    return parsed
+  }
+
+  const normalized = value.includes('T') ? value : `${value.replace(' ', 'T')}Z`
+  const normalizedParsed = Date.parse(normalized)
+  return Number.isNaN(normalizedParsed) ? Number.NEGATIVE_INFINITY : normalizedParsed
+}
+
+function getLatestTimestamp(left?: string | null, right?: string | null) {
+  return parseTimestamp(left) >= parseTimestamp(right) ? (left ?? null) : (right ?? null)
+}
+
+function isTimestampAfter(left?: string | null, right?: string | null) {
+  return parseTimestamp(left) > parseTimestamp(right)
+}
+
+function getTriggerPairs(allComments: Array<{ postId: string; agentId: string; createdAt?: string | null }>) {
+  const commentsByPost: Record<string, Record<string, Array<{ createdAt?: string | null }>>> = {}
+
+  for (const comment of allComments) {
+    if (!commentsByPost[comment.postId]) {
+      commentsByPost[comment.postId] = {}
+    }
+    if (!commentsByPost[comment.postId][comment.agentId]) {
+      commentsByPost[comment.postId][comment.agentId] = []
+    }
+    commentsByPost[comment.postId][comment.agentId].push(comment)
+  }
+
+  const triggerPairsByKey = new Map<string, TriggerPair>()
+
+  for (const postId of Object.keys(commentsByPost)) {
+    const commentsByAgent = commentsByPost[postId]
+    const agentsOnPost = Object.keys(commentsByAgent).sort()
+
+    for (let i = 0; i < agentsOnPost.length; i++) {
+      for (let j = i + 1; j < agentsOnPost.length; j++) {
+        const agentA = agentsOnPost[i]
+        const agentB = agentsOnPost[j]
+        const agentAComments = commentsByAgent[agentA]
+        const agentBComments = commentsByAgent[agentB]
+
+        if (agentAComments.length === 0 || agentBComments.length === 0) {
+          continue
+        }
+
+        const latestCommentAt = [...agentAComments, ...agentBComments].reduce<string | null>(
+          (latest, comment) => getLatestTimestamp(latest, comment.createdAt),
+          null
+        )
+        const pairKey = getPairKey(agentA, agentB)
+        const existing = triggerPairsByKey.get(pairKey)
+
+        if (!existing || isTimestampAfter(latestCommentAt, existing.latestCommentAt)) {
+          triggerPairsByKey.set(pairKey, {
+            agentA,
+            agentB,
+            latestCommentAt,
+          })
+        }
+      }
+    }
+  }
+
+  return Array.from(triggerPairsByKey.values())
+}
+
+async function getLatestDMTimestamp(agentAId: string, agentBId: string) {
+  const latestDM = await db
+    .select({ timestamp: interactionLogs.timestamp })
+    .from(interactionLogs)
+    .where(
+      and(
+        eq(interactionLogs.type, 'DM'),
+        or(
+          and(
+            eq(interactionLogs.agentA, agentAId),
+            eq(interactionLogs.agentB, agentBId),
+          ),
+          and(
+            eq(interactionLogs.agentA, agentBId),
+            eq(interactionLogs.agentB, agentAId),
+          ),
+        )
+      )
+    )
+    .orderBy(desc(sql`COALESCE(datetime(${interactionLogs.timestamp}), ${interactionLogs.timestamp})`))
+    .limit(1)
+    .get()
+
+  return latestDM?.timestamp ?? null
+}
 
 export async function checkAndTriggerDM() {
   console.log('[DM Action] Checking for DM triggers...')
 
   try {
-    // Find agent pairs who have mutual comments on the same post
-    // Group comments by (postId, agentId)
     const allComments = await db.select().from(comments).all()
+    const candidatePairs = getTriggerPairs(allComments)
+    const triggerPairs: TriggerPair[] = []
 
-    // Count comments per agent per post
-    const commentCounts: Record<string, Record<string, number>> = {}
-    for (const comment of allComments) {
-      if (!commentCounts[comment.postId]) {
-        commentCounts[comment.postId] = {}
-      }
-      commentCounts[comment.postId][comment.agentId] =
-        (commentCounts[comment.postId][comment.agentId] || 0) + 1
-    }
-
-    // Find pairs with 2+ mutual comments on same post
-    const triggerPairs: Array<{ postId: string; agentA: string; agentB: string }> = []
-
-    for (const postId of Object.keys(commentCounts)) {
-      const agentsOnPost = Object.keys(commentCounts[postId])
-      for (let i = 0; i < agentsOnPost.length; i++) {
-        for (let j = i + 1; j < agentsOnPost.length; j++) {
-          const agentA = agentsOnPost[i]
-          const agentB = agentsOnPost[j]
-          const countA = commentCounts[postId][agentA]
-          const countB = commentCounts[postId][agentB]
-
-          if (countA >= 1 && countB >= 1) {
-            // At least 1 comment each on same post triggers DM
-            triggerPairs.push({ postId, agentA, agentB })
-          }
-        }
+    for (const pair of candidatePairs) {
+      const latestDMAt = await getLatestDMTimestamp(pair.agentA, pair.agentB)
+      if (!latestDMAt || isTimestampAfter(pair.latestCommentAt, latestDMAt)) {
+        triggerPairs.push(pair)
       }
     }
 
-    console.log(`[DM Action] Found ${triggerPairs.length} potential DM pairs`)
+    console.log(`[DM Action] Found ${triggerPairs.length} DM pairs with new mutual comments (${candidatePairs.length} potential pairs)`)
 
     for (const pair of triggerPairs) {
-      await runDMSession(pair.agentA, pair.agentB)
+      await runDMSession(pair.agentA, pair.agentB, pair.latestCommentAt)
     }
 
     console.log('[DM Action] Completed')
@@ -54,32 +141,11 @@ export async function checkAndTriggerDM() {
   }
 }
 
-async function runDMSession(agentAId: string, agentBId: string) {
+async function runDMSession(agentAId: string, agentBId: string, latestCommentAt?: string | null) {
   try {
-    // Check if DM already exists between these agents (either direction)
-    const existingDM = await db
-      .select()
-      .from(interactionLogs)
-      .where(
-        and(
-          eq(interactionLogs.type, 'DM'),
-          or(
-            and(
-              eq(interactionLogs.agentA, agentAId),
-              eq(interactionLogs.agentB, agentBId),
-            ),
-            and(
-              eq(interactionLogs.agentA, agentBId),
-              eq(interactionLogs.agentB, agentAId),
-            ),
-          )
-        )
-      )
-      .limit(1)
-      .get()
-
-    if (existingDM) {
-      console.log(`[DM Action] DM already exists between ${agentAId} and ${agentBId}`)
+    const latestDMAt = await getLatestDMTimestamp(agentAId, agentBId)
+    if (latestDMAt && !isTimestampAfter(latestCommentAt, latestDMAt)) {
+      console.log(`[DM Action] No new mutual comments between ${agentAId} and ${agentBId}`)
       return
     }
 
@@ -137,14 +203,14 @@ async function runDMSession(agentAId: string, agentBId: string) {
     }
 
     // Both agents score each other
-    let scoreAtoB = 0
+    let scoreAtoB: number | null = null
     try {
       scoreAtoB = await generateScore(agentAId, agentBId, conversationHistory)
     } catch (error) {
       console.error('[DM Action] Score A->B LLM call failed:', error)
     }
 
-    let scoreBtoA = 0
+    let scoreBtoA: number | null = null
     try {
       scoreBtoA = await generateScore(agentBId, agentAId, conversationHistory)
     } catch (error) {
@@ -154,8 +220,12 @@ async function runDMSession(agentAId: string, agentBId: string) {
     console.log(`[DM Action] Scores: ${agentA.name} -> ${agentB.name}: ${scoreAtoB}, ${agentB.name} -> ${agentA.name}: ${scoreBtoA}`)
 
     // Update relationship scores
-    await updateRelationshipScore(agentAId, agentBId, scoreAtoB)
-    await updateRelationshipScore(agentBId, agentAId, scoreBtoA)
+    if (scoreAtoB !== null) {
+      await updateRelationshipScore(agentAId, agentBId, scoreAtoB)
+    }
+    if (scoreBtoA !== null) {
+      await updateRelationshipScore(agentBId, agentAId, scoreBtoA)
+    }
 
     console.log(`[DM Action] DM session completed`)
   } catch (error) {
@@ -164,35 +234,24 @@ async function runDMSession(agentAId: string, agentBId: string) {
 }
 
 async function updateRelationshipScore(agentA: string, agentB: string, score: number) {
-  const existing = await db
-    .select()
-    .from(relationshipScores)
-    .where(
-      and(
-        eq(relationshipScores.agentA, agentA),
-        eq(relationshipScores.agentB, agentB)
-      )
-    )
-    .get()
+  if (score === 0) {
+    return
+  }
 
-  if (existing) {
-    db.update(relationshipScores)
-      .set({
-        score: (existing.score || 0) + score,
-        updatedAt: new Date().toISOString(),
-      })
-      .where(
-        and(
-          eq(relationshipScores.agentA, agentA),
-          eq(relationshipScores.agentB, agentB)
-        )
-      )
-      .run()
-  } else {
-    db.insert(relationshipScores).values({
+  const updatedAt = new Date().toISOString()
+
+  await db.insert(relationshipScores).values({
       agentA,
       agentB,
       score,
-    }).run()
-  }
+      updatedAt,
+    })
+    .onConflictDoUpdate({
+      target: [relationshipScores.agentA, relationshipScores.agentB],
+      set: {
+        score: sql`coalesce(${relationshipScores.score}, 0) + ${score}`,
+        updatedAt,
+      },
+    })
+    .run()
 }
