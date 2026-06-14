@@ -9,6 +9,17 @@ const deleteMock = vi.fn(() => ({
   where: deleteWhereMock,
 }))
 
+const updateRunMock = vi.fn()
+const updateWhereMock = vi.fn(() => ({
+  run: updateRunMock,
+}))
+const updateSetMock = vi.fn(() => ({
+  where: updateWhereMock,
+}))
+const updateMock = vi.fn(() => ({
+  set: updateSetMock,
+}))
+
 const insertRunMock = vi.fn()
 const insertValuesMock = vi.fn(() => ({
   run: insertRunMock,
@@ -48,6 +59,7 @@ vi.mock('@/db', () => ({
   db: {
     select: selectMock,
     delete: deleteMock,
+    update: updateMock,
     transaction: transactionMock,
   },
 }))
@@ -68,6 +80,7 @@ vi.mock('drizzle-orm', () => ({
 vi.mock('@/lib/auth', () => ({
   generateJWT: generateJWTMock,
   isCodeExpired: isCodeExpiredMock,
+  MAX_VERIFICATION_ATTEMPTS: 5,
 }))
 
 describe('Verify Route', () => {
@@ -90,13 +103,14 @@ describe('Verify Route', () => {
     expect(await response.json()).toEqual({ error: '用户不存在或已验证' })
   })
 
-  it('should reject an invalid code without deleting pending state', async () => {
+  it('should reject an invalid code and increment attempts without deleting pending state', async () => {
     getMock.mockResolvedValue({
       userId: 'pending-user',
       email: 'test@example.com',
       passwordHash: 'hashed-password',
       verificationCode: '654321',
       codeExpiry: new Date('2026-04-14T12:10:00.000Z'),
+      attempts: 0,
     })
     const { POST } = await import('./route')
 
@@ -109,6 +123,32 @@ describe('Verify Route', () => {
     expect(response.status).toBe(400)
     expect(await response.json()).toEqual({ error: '验证码错误' })
     expect(deleteMock).not.toHaveBeenCalled()
+    expect(transactionMock).not.toHaveBeenCalled()
+    expect(updateSetMock).toHaveBeenCalledWith({ attempts: 1 })
+  })
+
+  it('should delete pending state and return 429 after too many wrong attempts', async () => {
+    getMock.mockResolvedValue({
+      userId: 'pending-user',
+      email: 'test@example.com',
+      passwordHash: 'hashed-password',
+      verificationCode: '654321',
+      codeExpiry: new Date('2026-04-14T12:10:00.000Z'),
+      attempts: 4,
+    })
+    const { POST } = await import('./route')
+
+    const response = await POST(new Request('http://localhost/api/auth/verify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: 'pending-user', code: '123456' }),
+    }) as never)
+
+    expect(response.status).toBe(429)
+    expect(deleteWhereMock).toHaveBeenCalledWith({
+      left: 'pending_users.user_id',
+      right: 'pending-user',
+    })
     expect(transactionMock).not.toHaveBeenCalled()
   })
 

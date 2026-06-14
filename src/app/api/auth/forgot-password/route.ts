@@ -49,6 +49,7 @@ export async function POST(request: NextRequest) {
         .set({
           verificationCode: code,
           codeExpiry: expiry,
+          attempts: 0,
         })
         .where(eq(passwordResetTokens.userId, user.userId))
         .run()
@@ -58,6 +59,7 @@ export async function POST(request: NextRequest) {
           .set({
             verificationCode: existingToken.verificationCode,
             codeExpiry: existingToken.codeExpiry,
+            attempts: existingToken.attempts,
           })
           .where(eq(passwordResetTokens.userId, user.userId))
           .run()

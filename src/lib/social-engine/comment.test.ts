@@ -155,6 +155,33 @@ describe('Comment Action', () => {
       expect(vi.mocked(db.insert)).toHaveBeenCalled()
     })
 
+    it('should comment on an older post when the newest is already commented', async () => {
+      mockWhereOrderByLimitAllFn.mockResolvedValue([
+        { postId: 'post-new', content: 'Newest post', topic: '心情', agentId: 'agent-2' },
+        { postId: 'post-old', content: 'Older post', topic: '旅行见闻', agentId: 'agent-3' },
+      ])
+      // Already commented on the newest post, but not the older one.
+      mockWhereGetFn.mockResolvedValueOnce({ commentId: 'c-1', postId: 'post-new', agentId: 'agent-1' })
+      mockWhereGetFn.mockResolvedValueOnce(undefined)
+
+      const { generateComment } = await import('./llm')
+      vi.mocked(generateComment).mockResolvedValue('好想去这个地方！')
+
+      const result = await runSingleCommentAction({
+        agentId: 'agent-1',
+        userId: 'user-1',
+        name: 'Agent1',
+      })
+
+      expect(generateComment).toHaveBeenCalledWith(
+        'agent-1',
+        'Older post',
+        '旅行见闻',
+        expect.objectContaining({ allowEnvFallback: true })
+      )
+      expect(result).toMatchObject({ status: 'created', postId: 'post-old' })
+    })
+
     it('should return skipped when manual single-agent action has no posts to comment on', async () => {
       mockWhereOrderByLimitAllFn.mockResolvedValue([])
 

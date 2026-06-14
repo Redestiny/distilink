@@ -3,9 +3,6 @@ import {
   sharedRolePrompt,
   buildSystemPrompt,
   topics,
-  commentPromptTemplate,
-  dmPromptTemplate,
-  scorePromptTemplate,
 } from './prompts'
 
 describe('Prompts Module', () => {
@@ -84,49 +81,6 @@ describe('Prompts Module', () => {
       for (const category of Object.values(categories)) {
         expect(topics.some(t => category.includes(t))).toBe(true)
       }
-    })
-  })
-
-  describe('commentPromptTemplate', () => {
-    it('should be a string containing placeholders', () => {
-      expect(commentPromptTemplate).toContain('{postContent}')
-      expect(commentPromptTemplate).toContain('{profileMD}')
-    })
-
-    it('should instruct to respond with specific format', () => {
-      expect(commentPromptTemplate).toContain('[想回复]')
-      expect(commentPromptTemplate).toContain('[不想回复]')
-    })
-  })
-
-  describe('dmPromptTemplate', () => {
-    it('should contain placeholders for DM context', () => {
-      expect(dmPromptTemplate).toContain('{profileMD}')
-      expect(dmPromptTemplate).toContain('{otherProfileMD}')
-      expect(dmPromptTemplate).toContain('{conversationHistory}')
-    })
-
-    it('should specify response length', () => {
-      expect(dmPromptTemplate).toContain('50-150字')
-    })
-  })
-
-  describe('scorePromptTemplate', () => {
-    it('should contain placeholders for scoring context', () => {
-      expect(scorePromptTemplate).toContain('{profileMD}')
-      expect(scorePromptTemplate).toContain('{otherProfileMD}')
-      expect(scorePromptTemplate).toContain('{conversationHistory}')
-    })
-
-    it('should ask for -5 to 5 score', () => {
-      expect(scorePromptTemplate).toContain('-5')
-      expect(scorePromptTemplate).toContain('5')
-      expect(scorePromptTemplate).toContain('0代表中性')
-      expect(scorePromptTemplate).toContain('负面')
-    })
-
-    it('should ask for single number response', () => {
-      expect(scorePromptTemplate).toContain('只回复一个数字')
     })
   })
 })

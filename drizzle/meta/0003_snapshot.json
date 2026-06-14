@@ -1,8 +1,6 @@
 {
-  "version": "5",
+  "version": "6",
   "dialect": "sqlite",
-  "id": "e1edbf70-4407-48f8-8e9e-36c92630361a",
-  "prevId": "48ca193c-aac5-4157-ba78-a0c1350fe56c",
   "tables": {
     "agents": {
       "name": "agents",
@@ -56,19 +54,20 @@
         "agents_user_id_users_user_id_fk": {
           "name": "agents_user_id_users_user_id_fk",
           "tableFrom": "agents",
-          "tableTo": "users",
           "columnsFrom": [
             "user_id"
           ],
+          "tableTo": "users",
           "columnsTo": [
             "user_id"
           ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {}
+      "uniqueConstraints": {},
+      "checkConstraints": {}
     },
     "comments": {
       "name": "comments",
@@ -122,32 +121,33 @@
         "comments_post_id_posts_post_id_fk": {
           "name": "comments_post_id_posts_post_id_fk",
           "tableFrom": "comments",
-          "tableTo": "posts",
           "columnsFrom": [
             "post_id"
           ],
+          "tableTo": "posts",
           "columnsTo": [
             "post_id"
           ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         },
         "comments_agent_id_agents_agent_id_fk": {
           "name": "comments_agent_id_agents_agent_id_fk",
           "tableFrom": "comments",
-          "tableTo": "agents",
           "columnsFrom": [
             "agent_id"
           ],
+          "tableTo": "agents",
           "columnsTo": [
             "agent_id"
           ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {}
+      "uniqueConstraints": {},
+      "checkConstraints": {}
     },
     "interaction_logs": {
       "name": "interaction_logs",
@@ -201,19 +201,20 @@
         "interaction_logs_agent_a_agents_agent_id_fk": {
           "name": "interaction_logs_agent_a_agents_agent_id_fk",
           "tableFrom": "interaction_logs",
-          "tableTo": "agents",
           "columnsFrom": [
             "agent_a"
           ],
+          "tableTo": "agents",
           "columnsTo": [
             "agent_id"
           ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {}
+      "uniqueConstraints": {},
+      "checkConstraints": {}
     },
     "llm_configs": {
       "name": "llm_configs",
@@ -273,32 +274,33 @@
         "llm_configs_user_id_users_user_id_fk": {
           "name": "llm_configs_user_id_users_user_id_fk",
           "tableFrom": "llm_configs",
-          "tableTo": "users",
           "columnsFrom": [
             "user_id"
           ],
+          "tableTo": "users",
           "columnsTo": [
             "user_id"
           ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         },
         "llm_configs_agent_id_agents_agent_id_fk": {
           "name": "llm_configs_agent_id_agents_agent_id_fk",
           "tableFrom": "llm_configs",
-          "tableTo": "agents",
           "columnsFrom": [
             "agent_id"
           ],
+          "tableTo": "agents",
           "columnsTo": [
             "agent_id"
           ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {}
+      "uniqueConstraints": {},
+      "checkConstraints": {}
     },
     "match_statuses": {
       "name": "match_statuses",
@@ -348,32 +350,33 @@
         "match_statuses_user_a_users_user_id_fk": {
           "name": "match_statuses_user_a_users_user_id_fk",
           "tableFrom": "match_statuses",
-          "tableTo": "users",
           "columnsFrom": [
             "user_a"
           ],
+          "tableTo": "users",
           "columnsTo": [
             "user_id"
           ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         },
         "match_statuses_user_b_users_user_id_fk": {
           "name": "match_statuses_user_b_users_user_id_fk",
           "tableFrom": "match_statuses",
-          "tableTo": "users",
           "columnsFrom": [
             "user_b"
           ],
+          "tableTo": "users",
           "columnsTo": [
             "user_id"
           ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {}
+      "uniqueConstraints": {},
+      "checkConstraints": {}
     },
     "password_reset_tokens": {
       "name": "password_reset_tokens",
@@ -403,7 +406,8 @@
       "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {}
+      "uniqueConstraints": {},
+      "checkConstraints": {}
     },
     "pending_users": {
       "name": "pending_users",
@@ -463,7 +467,8 @@
       },
       "foreignKeys": {},
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {}
+      "uniqueConstraints": {},
+      "checkConstraints": {}
     },
     "posts": {
       "name": "posts",
@@ -510,19 +515,20 @@
         "posts_agent_id_agents_agent_id_fk": {
           "name": "posts_agent_id_agents_agent_id_fk",
           "tableFrom": "posts",
-          "tableTo": "agents",
           "columnsFrom": [
             "agent_id"
           ],
+          "tableTo": "agents",
           "columnsTo": [
             "agent_id"
           ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {}
+      "uniqueConstraints": {},
+      "checkConstraints": {}
     },
     "relationship_scores": {
       "name": "relationship_scores",
@@ -572,32 +578,33 @@
         "relationship_scores_agent_a_agents_agent_id_fk": {
           "name": "relationship_scores_agent_a_agents_agent_id_fk",
           "tableFrom": "relationship_scores",
-          "tableTo": "agents",
           "columnsFrom": [
             "agent_a"
           ],
+          "tableTo": "agents",
           "columnsTo": [
             "agent_id"
           ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         },
         "relationship_scores_agent_b_agents_agent_id_fk": {
           "name": "relationship_scores_agent_b_agents_agent_id_fk",
           "tableFrom": "relationship_scores",
-          "tableTo": "agents",
           "columnsFrom": [
             "agent_b"
           ],
+          "tableTo": "agents",
           "columnsTo": [
             "agent_id"
           ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {}
+      "uniqueConstraints": {},
+      "checkConstraints": {}
     },
     "users": {
       "name": "users",
@@ -658,13 +665,16 @@
       },
       "foreignKeys": {},
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {}
+      "uniqueConstraints": {},
+      "checkConstraints": {}
     }
   },
   "enums": {},
   "_meta": {
-    "schemas": {},
     "tables": {},
     "columns": {}
-  }
+  },
+  "id": "e1edbf70-4407-48f8-8e9e-36c92630361a",
+  "prevId": "48ca193c-aac5-4157-ba78-a0c1350fe56c",
+  "views": {}
 }

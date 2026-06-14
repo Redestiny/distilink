@@ -90,21 +90,23 @@ export async function runSingleCommentAction(
       }
     }
 
-    const post = recentPosts[0]
-    if (!post) {
-      return {
-        status: 'skipped',
-        reason: 'no posts available to comment on',
+    // Walk the candidate posts (newest first) and pick the first one this agent
+    // hasn't commented on yet, so older posts still get attention instead of
+    // every agent piling onto the single newest post.
+    let post: (typeof recentPosts)[number] | null = null
+    for (const candidate of recentPosts) {
+      const existingComment = await hasCommentedOnPost(agent.agentId, candidate.postId)
+      if (!existingComment) {
+        post = candidate
+        break
       }
     }
 
-    const existingComment = await hasCommentedOnPost(agent.agentId, post.postId)
-    if (existingComment) {
-      console.log(`[Comment Action] Agent ${agent.name} already commented on post ${post.postId}`)
+    if (!post) {
+      console.log(`[Comment Action] Agent ${agent.name} already commented on all candidate posts`)
       return {
         status: 'skipped',
-        postId: post.postId,
-        reason: 'agent already commented on post',
+        reason: 'agent already commented on all candidate posts',
       }
     }
 

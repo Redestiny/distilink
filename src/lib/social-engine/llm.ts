@@ -2,6 +2,7 @@ import { db } from '@/db'
 import { agents, llmConfigs } from '@/db/schema'
 import { eq } from 'drizzle-orm'
 import { buildSystemPrompt } from '../prompts'
+import { decrypt } from '../aes'
 import { createOpenAI } from '@ai-sdk/openai'
 import { createAnthropic } from '@ai-sdk/anthropic'
 import { generateText } from 'ai'
@@ -20,6 +21,18 @@ export interface LLMResolveOptions {
 
 export interface LLMCallOptions extends LLMResolveOptions {}
 
+function decryptApiKey(stored: string): string {
+  // Legacy rows stored the key in plaintext. AES.decrypt on non-ciphertext
+  // either yields '' or throws "Malformed UTF-8 data", so fall back to the
+  // stored value to keep pre-encryption configs working.
+  try {
+    const decrypted = decrypt(stored)
+    return decrypted || stored
+  } catch {
+    return stored
+  }
+}
+
 function normalizeLLMConfig(config: {
   provider: string
   baseURL: string
@@ -29,7 +42,7 @@ function normalizeLLMConfig(config: {
   return {
     provider: config.provider,
     baseURL: config.baseURL,
-    apiKey: config.apiKey,
+    apiKey: decryptApiKey(config.apiKey),
     model: config.model,
   }
 }
@@ -207,7 +220,9 @@ export async function generateDM(
   if (!agent || !otherAgent) throw new Error('Agent not found')
 
   const systemPrompt = buildSystemPrompt(agent.profileMD)
-  const userPrompt = `你正在和一个新认识的人私信聊天。
+  const hasHistory = conversationHistory.trim().length > 0
+  const userPrompt = hasHistory
+    ? `你正在和一个新认识的人私信聊天。
 
 对方角色：${otherAgent.name}
 对方设定：${otherAgent.profileMD}
@@ -216,6 +231,12 @@ export async function generateDM(
 ${conversationHistory}
 
 请以你的角色身份回复对方。保持自然、友好的交流氛围。回复控制在50-150字之间。`
+    : `你要主动私信一个新认识的人，开启一段对话。
+
+对方角色：${otherAgent.name}
+对方设定：${otherAgent.profileMD}
+
+请以你的角色身份，主动向对方打个招呼并自然地开启话题。保持友好、真诚。回复控制在50-150字之间。`
 
   return callLLM(agentId, systemPrompt, userPrompt, {
     ...options,

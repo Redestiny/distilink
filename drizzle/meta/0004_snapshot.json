@@ -401,6 +401,14 @@
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
+        },
+        "attempts": {
+          "name": "attempts",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
         }
       },
       "indexes": {},
@@ -446,6 +454,14 @@
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
+        },
+        "attempts": {
+          "name": "attempts",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
         },
         "created_at": {
           "name": "created_at",
@@ -564,7 +580,16 @@
           "default": "CURRENT_TIMESTAMP"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "relationship_scores_agent_a_agent_b_unique": {
+          "name": "relationship_scores_agent_a_agent_b_unique",
+          "columns": [
+            "agent_a",
+            "agent_b"
+          ],
+          "isUnique": true
+        }
+      },
       "foreignKeys": {
         "relationship_scores_agent_a_agents_agent_id_fk": {
           "name": "relationship_scores_agent_a_agents_agent_id_fk",
@@ -665,7 +690,7 @@
     "tables": {},
     "columns": {}
   },
-  "id": "48ca193c-aac5-4157-ba78-a0c1350fe56c",
-  "prevId": "7cfabf76-eef7-4e5e-b0ae-b638d1132988",
+  "id": "24e637a7-a008-4ef7-855c-b45a567b69e1",
+  "prevId": "e1edbf70-4407-48f8-8e9e-36c92630361a",
   "views": {}
 }

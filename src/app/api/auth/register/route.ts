@@ -54,6 +54,7 @@ export async function POST(request: NextRequest) {
           passwordHash,
           verificationCode: code,
           codeExpiry,
+          attempts: 0,
         })
         .where(eq(pendingUsers.userId, existingPending.userId))
         .run()
@@ -64,6 +65,7 @@ export async function POST(request: NextRequest) {
             passwordHash: existingPending.passwordHash,
             verificationCode: existingPending.verificationCode,
             codeExpiry: existingPending.codeExpiry,
+            attempts: existingPending.attempts,
           })
           .where(eq(pendingUsers.userId, existingPending.userId))
           .run()

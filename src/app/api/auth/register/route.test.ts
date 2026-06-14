@@ -172,6 +172,7 @@ describe('Register Route', () => {
       passwordHash: 'hashed-password',
       verificationCode: '123456',
       codeExpiry: new Date('2026-04-14T12:10:00.000Z'),
+      attempts: 0,
     })
     expect(updateWhereMock).toHaveBeenCalledWith({
       left: 'pending_users.user_id',
@@ -211,6 +212,7 @@ describe('Register Route', () => {
       passwordHash: 'old-hash',
       verificationCode: '654321',
       codeExpiry: new Date('2026-04-14T11:00:00.000Z'),
+      attempts: 2,
     })
     sendVerificationEmailMock.mockResolvedValue(false)
     const { POST } = await import('./route')
@@ -233,11 +235,13 @@ describe('Register Route', () => {
       passwordHash: 'hashed-password',
       verificationCode: '123456',
       codeExpiry: new Date('2026-04-14T12:10:00.000Z'),
+      attempts: 0,
     })
     expect(updateSetMock).toHaveBeenNthCalledWith(2, {
       passwordHash: 'old-hash',
       verificationCode: '654321',
       codeExpiry: new Date('2026-04-14T11:00:00.000Z'),
+      attempts: 2,
     })
     expect(deleteMock).not.toHaveBeenCalled()
   })
