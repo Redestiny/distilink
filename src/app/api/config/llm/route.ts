@@ -3,6 +3,7 @@ import { db } from '@/db'
 import { llmConfigs } from '@/db/schema'
 import { eq, and, isNull } from 'drizzle-orm'
 import { verifyJWT } from '@/lib/auth'
+import { encrypt } from '@/lib/aes'
 import { v4 as uuidv4 } from 'uuid'
 
 export const dynamic = 'force-dynamic'
@@ -72,10 +73,13 @@ export async function POST(request: NextRequest) {
       )
       .get()
 
+    // Encrypt the API key at rest (same AES key as contact info).
+    const encryptedApiKey = encrypt(apiKey)
+
     if (existing) {
       // Update
       db.update(llmConfigs)
-        .set({ provider, apiKey, baseURL, model })
+        .set({ provider, apiKey: encryptedApiKey, baseURL, model })
         .where(eq(llmConfigs.configId, existing.configId))
         .run()
 
@@ -88,7 +92,7 @@ export async function POST(request: NextRequest) {
       userId: payload.userId,
       agentId: agentId || null,
       provider,
-      apiKey,
+      apiKey: encryptedApiKey,
       baseURL,
       model,
     }).run()

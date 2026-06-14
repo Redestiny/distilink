@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/db'
 import { users, pendingUsers } from '@/db/schema'
 import { eq } from 'drizzle-orm'
-import { generateJWT, isCodeExpired } from '@/lib/auth'
+import { generateJWT, isCodeExpired, MAX_VERIFICATION_ATTEMPTS } from '@/lib/auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -30,6 +30,19 @@ export async function POST(request: NextRequest) {
     }
 
     if (pendingUser.verificationCode !== code) {
+      const attempts = (pendingUser.attempts ?? 0) + 1
+      if (attempts >= MAX_VERIFICATION_ATTEMPTS) {
+        await db.delete(pendingUsers).where(eq(pendingUsers.userId, userId)).run()
+        return NextResponse.json(
+          { error: '验证码错误次数过多，请重新注册获取验证码' },
+          { status: 429 }
+        )
+      }
+
+      await db.update(pendingUsers)
+        .set({ attempts })
+        .where(eq(pendingUsers.userId, userId))
+        .run()
       return NextResponse.json({ error: '验证码错误' }, { status: 400 })
     }
 

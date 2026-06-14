@@ -1,9 +1,31 @@
 import jwt from 'jsonwebtoken'
 import bcrypt from 'bcryptjs'
+import { randomInt } from 'crypto'
 import { v4 as uuidv4 } from 'uuid'
 
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-jwt-secret'
+const DEV_JWT_SECRET = 'dev-jwt-secret'
 const JWT_EXPIRY = '7d'
+
+// Max wrong-code submissions before a verification code is invalidated.
+export const MAX_VERIFICATION_ATTEMPTS = 5
+
+/**
+ * Resolve the JWT signing secret. In production a missing JWT_SECRET is a
+ * fatal misconfiguration (tokens would be forgeable with a public default),
+ * so we refuse to run. In dev/test we fall back to a throwaway value.
+ */
+function getJwtSecret(): string {
+  const secret = process.env.JWT_SECRET
+  if (secret) {
+    return secret
+  }
+
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('JWT_SECRET must be set in production')
+  }
+
+  return DEV_JWT_SECRET
+}
 
 export interface JWTPayload {
   userId: string
@@ -11,12 +33,12 @@ export interface JWTPayload {
 }
 
 export function generateJWT(payload: JWTPayload): string {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRY })
+  return jwt.sign(payload, getJwtSecret(), { expiresIn: JWT_EXPIRY })
 }
 
 export function verifyJWT(token: string): JWTPayload | null {
   try {
-    return jwt.verify(token, JWT_SECRET) as JWTPayload
+    return jwt.verify(token, getJwtSecret()) as JWTPayload
   } catch {
     return null
   }
@@ -31,7 +53,8 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
 }
 
 export function generateVerificationCode(): string {
-  return Math.floor(100000 + Math.random() * 900000).toString()
+  // Cryptographically secure 6-digit code (100000-999999) to resist guessing.
+  return randomInt(100000, 1000000).toString()
 }
 
 export function generateUserId(): string {

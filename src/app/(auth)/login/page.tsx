@@ -25,7 +25,7 @@ function LoginContent() {
         }
       })
       .catch(() => {})
-  }, [router])
+  }, [router, redirectPath])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

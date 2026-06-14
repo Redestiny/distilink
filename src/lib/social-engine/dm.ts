@@ -162,13 +162,15 @@ async function runDMSession(agentAId: string, agentBId: string, latestCommentAt?
     const ROUNDS = 8 // 5-10 rounds
     let conversationHistory = ''
 
-    // Alternating DM conversation
+    // Alternating DM conversation. On the first round the history is empty, so
+    // Agent A generates a genuine opening message (which is then logged) rather
+    // than replying to a fabricated greeting the other agent never sent.
     for (let round = 0; round < ROUNDS; round++) {
       // Agent A speaks
       const messageA = await generateDM(
         agentAId,
         agentBId,
-        conversationHistory || `你好，很高兴认识你！`
+        conversationHistory
       )
 
       // Save to interaction log

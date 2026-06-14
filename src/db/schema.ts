@@ -18,6 +18,7 @@ export const pendingUsers = sqliteTable('pending_users', {
   passwordHash: text('password_hash').notNull(),
   verificationCode: text('verification_code'),
   codeExpiry: integer('code_expiry', { mode: 'timestamp' }),
+  attempts: integer('attempts').notNull().default(0),
   createdAt: text('created_at').default(sql`CURRENT_TIMESTAMP`),
 })
 
@@ -26,6 +27,7 @@ export const passwordResetTokens = sqliteTable('password_reset_tokens', {
   userId: text('user_id').primaryKey(),
   verificationCode: text('verification_code'),
   codeExpiry: integer('code_expiry', { mode: 'timestamp' }),
+  attempts: integer('attempts').notNull().default(0),
 })
 
 // Agents table

@@ -130,6 +130,7 @@ describe('Forgot Password Route', () => {
       userId: 'user-123',
       verificationCode: '654321',
       codeExpiry: new Date('2026-04-14T11:00:00.000Z'),
+      attempts: 3,
     })
     const { POST } = await import('./route')
 
@@ -144,6 +145,7 @@ describe('Forgot Password Route', () => {
     expect(updateSetMock).toHaveBeenCalledWith({
       verificationCode: '123456',
       codeExpiry: new Date('2026-04-14T12:10:00.000Z'),
+      attempts: 0,
     })
     expect(updateWhereMock).toHaveBeenCalledWith({
       left: 'password_reset_tokens.user_id',
@@ -183,6 +185,7 @@ describe('Forgot Password Route', () => {
       userId: 'user-123',
       verificationCode: '654321',
       codeExpiry: new Date('2026-04-14T11:00:00.000Z'),
+      attempts: 3,
     })
     sendVerificationEmailMock.mockResolvedValue(false)
     const { POST } = await import('./route')
@@ -198,10 +201,12 @@ describe('Forgot Password Route', () => {
     expect(updateSetMock).toHaveBeenNthCalledWith(1, {
       verificationCode: '123456',
       codeExpiry: new Date('2026-04-14T12:10:00.000Z'),
+      attempts: 0,
     })
     expect(updateSetMock).toHaveBeenNthCalledWith(2, {
       verificationCode: '654321',
       codeExpiry: new Date('2026-04-14T11:00:00.000Z'),
+      attempts: 3,
     })
   })
 })

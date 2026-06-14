@@ -10,6 +10,17 @@ const deleteMock = vi.fn(() => ({
   where: deleteWhereMock,
 }))
 
+const updateRunMock = vi.fn()
+const updateWhereMock = vi.fn(() => ({
+  run: updateRunMock,
+}))
+const updateSetMock = vi.fn(() => ({
+  where: updateWhereMock,
+}))
+const updateMock = vi.fn(() => ({
+  set: updateSetMock,
+}))
+
 const txUpdateRunMock = vi.fn()
 const txUpdateWhereMock = vi.fn(() => ({
   run: txUpdateRunMock,
@@ -53,6 +64,7 @@ vi.mock('@/db', () => ({
   db: {
     select: selectMock,
     delete: deleteMock,
+    update: updateMock,
     transaction: transactionMock,
   },
 }))
@@ -75,6 +87,7 @@ vi.mock('@/lib/auth', () => ({
   generateJWT: generateJWTMock,
   hashPassword: hashPasswordMock,
   isCodeExpired: isCodeExpiredMock,
+  MAX_VERIFICATION_ATTEMPTS: 5,
 }))
 
 describe('Reset Password Route', () => {
@@ -136,7 +149,7 @@ describe('Reset Password Route', () => {
     })
   })
 
-  it('should keep token when the code is wrong', async () => {
+  it('should keep token but increment attempts when the code is wrong', async () => {
     getMock.mockResolvedValueOnce({
       userId: 'user-123',
       email: 'test@example.com',
@@ -145,6 +158,7 @@ describe('Reset Password Route', () => {
       userId: 'user-123',
       verificationCode: '654321',
       codeExpiry: new Date('2026-04-14T12:10:00.000Z'),
+      attempts: 0,
     })
     const { POST } = await import('./route')
 
@@ -161,6 +175,38 @@ describe('Reset Password Route', () => {
     expect(response.status).toBe(400)
     expect(await response.json()).toEqual({ error: '验证码错误' })
     expect(deleteMock).not.toHaveBeenCalled()
+    expect(transactionMock).not.toHaveBeenCalled()
+    expect(updateSetMock).toHaveBeenCalledWith({ attempts: 1 })
+  })
+
+  it('should delete token and return 429 after too many wrong attempts', async () => {
+    getMock.mockResolvedValueOnce({
+      userId: 'user-123',
+      email: 'test@example.com',
+    })
+    getMock.mockResolvedValueOnce({
+      userId: 'user-123',
+      verificationCode: '654321',
+      codeExpiry: new Date('2026-04-14T12:10:00.000Z'),
+      attempts: 4,
+    })
+    const { POST } = await import('./route')
+
+    const response = await POST(new Request('http://localhost/api/auth/reset-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: 'test@example.com',
+        code: '123456',
+        newPassword: 'secret123',
+      }),
+    }) as never)
+
+    expect(response.status).toBe(429)
+    expect(deleteWhereMock).toHaveBeenCalledWith({
+      left: 'password_reset_tokens.user_id',
+      right: 'user-123',
+    })
     expect(transactionMock).not.toHaveBeenCalled()
   })
 

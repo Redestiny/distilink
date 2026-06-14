@@ -6,28 +6,16 @@ import { db } from '@/db'
 import { matchStatuses } from '@/db/schema'
 import { eq, and } from 'drizzle-orm'
 
-// Slot counter for load balancing
-let currentSlot = 0
-
 export function startCronJobs() {
   console.log('[Cron] Starting cron jobs...')
 
-  // Post action: Every 10 minutes
-  // We use slot-based approach within the job
+  // Social engine tick: every 10 minutes. Each action selects its own slot
+  // agents internally for load balancing. Post -> Comment -> DM run in order
+  // so the DM check sees the comments produced earlier in the same tick.
   cron.schedule('*/10 * * * *', async () => {
-    console.log('[Cron] Post + Comment action triggered')
-    currentSlot = (currentSlot + 1) % 144
-
-    // Run post action
+    console.log('[Cron] Social engine tick: post + comment + DM')
     await runPostAction()
-
-    // Run comment action
     await runCommentAction()
-  })
-
-  // DM check: Every 10 minutes (after comment action has run)
-  cron.schedule('*/10 * * * *', async () => {
-    console.log('[Cron] DM check triggered')
     await checkAndTriggerDM()
   })
 

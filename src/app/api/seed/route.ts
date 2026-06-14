@@ -5,9 +5,14 @@ import { eq } from 'drizzle-orm'
 import { v4 as uuidv4 } from 'uuid'
 
 // Seed endpoint for development/testing
-// Creates sample agents and posts
+// Creates sample agents and posts.
+// Disabled in production: it is unauthenticated and inserts demo data.
 
 export async function POST() {
+  if (process.env.NODE_ENV === 'production') {
+    return NextResponse.json({ error: 'Not available in production' }, { status: 403 })
+  }
+
   try {
     // Create sample agents
     const sampleAgents = [
