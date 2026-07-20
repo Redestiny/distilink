@@ -2,7 +2,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import {
   callLLM,
   generatePost,
-  generateComment,
+  generateThreadedComment,
+  generateThreadReply,
+  parseThreadedCommentDecision,
   generateDM,
   generateScore,
   resolveLLMConfig,
@@ -197,8 +199,53 @@ describe('LLM Module', () => {
     })
   })
 
-  describe('generateComment', () => {
-    it('should return null when agent chooses not to comment', async () => {
+  describe('parseThreadedCommentDecision', () => {
+    it('should return null when agent declines', () => {
+      expect(parseThreadedCommentDecision('不想回复', 3)).toBeNull()
+      expect(parseThreadedCommentDecision('我选择：不想回复。', 3)).toBeNull()
+    })
+
+    it('should parse a top-level comment decision', () => {
+      expect(parseThreadedCommentDecision('回复帖子\n这是我的评论', 3)).toEqual({
+        target: 'post',
+        content: '这是我的评论',
+      })
+    })
+
+    it('should parse a threaded reply decision', () => {
+      expect(parseThreadedCommentDecision('回复 #2\n同感，我也这么觉得！', 3)).toEqual({
+        target: 2,
+        content: '同感，我也这么觉得！',
+      })
+      expect(parseThreadedCommentDecision('回复#1\n哈哈', 3)).toEqual({
+        target: 1,
+        content: '哈哈',
+      })
+    })
+
+    it('should fall back to post when the index is out of range', () => {
+      expect(parseThreadedCommentDecision('回复 #9\n有意思', 3)).toEqual({
+        target: 'post',
+        content: '有意思',
+      })
+    })
+
+    it('should treat unstructured output as a top-level comment', () => {
+      expect(parseThreadedCommentDecision('说得很有道理！', 3)).toEqual({
+        target: 'post',
+        content: '说得很有道理！',
+      })
+    })
+
+    it('should return null when a reply directive has no content', () => {
+      expect(parseThreadedCommentDecision('回复 #2', 3)).toBeNull()
+      expect(parseThreadedCommentDecision('回复帖子', 3)).toBeNull()
+      expect(parseThreadedCommentDecision('', 3)).toBeNull()
+    })
+  })
+
+  describe('generateThreadedComment', () => {
+    const mockLLMSetup = () => {
       mockWhereGetFn
         .mockResolvedValueOnce({
           agentId: 'test-agent',
@@ -216,16 +263,54 @@ describe('LLM Module', () => {
           agentId: null,
         },
       ])
+    }
+
+    it('should return null when agent chooses not to comment', async () => {
+      mockLLMSetup()
 
       const { generateText } = await import('ai')
       vi.mocked(generateText).mockResolvedValue({ text: '不想回复' } as any)
 
-      const comment = await generateComment('test-agent', 'Some post content', 'Test Topic')
+      const decision = await generateThreadedComment('test-agent', {
+        postContent: 'Some post content',
+        postTopic: 'Test Topic',
+        comments: [],
+      })
 
-      expect(comment).toBeNull()
+      expect(decision).toBeNull()
     })
 
-    it('should return comment when agent wants to respond', async () => {
+    it('should include existing comments in the prompt and parse the reply target', async () => {
+      mockLLMSetup()
+
+      const { generateText } = await import('ai')
+      vi.mocked(generateText).mockResolvedValue({ text: '回复 #1\n确实如此！' } as any)
+
+      const decision = await generateThreadedComment('test-agent', {
+        postContent: 'Some post content',
+        postTopic: 'Test Topic',
+        comments: [
+          { index: 1, authorName: 'Alice', content: '很有意思的观点' },
+          { index: 2, authorName: 'Bob', content: '我不太同意', replyToIndex: 1 },
+        ],
+      })
+
+      expect(decision).toEqual({ target: 1, content: '确实如此！' })
+      expect(generateText).toHaveBeenCalledWith(
+        expect.objectContaining({
+          prompt: expect.stringContaining('#1 Alice：很有意思的观点'),
+        })
+      )
+      expect(generateText).toHaveBeenCalledWith(
+        expect.objectContaining({
+          prompt: expect.stringContaining('#2 Bob（回复 #1）：我不太同意'),
+        })
+      )
+    })
+  })
+
+  describe('generateThreadReply', () => {
+    const mockLLMSetup = () => {
       mockWhereGetFn
         .mockResolvedValueOnce({
           agentId: 'test-agent',
@@ -243,13 +328,47 @@ describe('LLM Module', () => {
           agentId: null,
         },
       ])
+    }
+
+    it('should return null when agent declines to continue the thread', async () => {
+      mockLLMSetup()
 
       const { generateText } = await import('ai')
-      vi.mocked(generateText).mockResolvedValue({ text: '说得很有道理！' } as any)
+      vi.mocked(generateText).mockResolvedValue({ text: '不想回复' } as any)
 
-      const comment = await generateComment('test-agent', 'Some post content', 'Test Topic')
+      const reply = await generateThreadReply('test-agent', {
+        postContent: 'Some post content',
+        postTopic: null,
+        thread: [
+          { authorName: '你', content: '我觉得不错' },
+          { authorName: 'Alice', content: '为什么这么说？' },
+        ],
+      })
 
-      expect(comment).toBe('说得很有道理！')
+      expect(reply).toBeNull()
+    })
+
+    it('should return reply content and include the thread in the prompt', async () => {
+      mockLLMSetup()
+
+      const { generateText } = await import('ai')
+      vi.mocked(generateText).mockResolvedValue({ text: '因为我亲身体验过呀。' } as any)
+
+      const reply = await generateThreadReply('test-agent', {
+        postContent: 'Some post content',
+        postTopic: 'Test Topic',
+        thread: [
+          { authorName: '你', content: '我觉得不错' },
+          { authorName: 'Alice', content: '为什么这么说？' },
+        ],
+      })
+
+      expect(reply).toBe('因为我亲身体验过呀。')
+      expect(generateText).toHaveBeenCalledWith(
+        expect.objectContaining({
+          prompt: expect.stringContaining('Alice：为什么这么说？'),
+        })
+      )
     })
   })
 

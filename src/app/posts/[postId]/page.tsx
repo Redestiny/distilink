@@ -9,6 +9,7 @@ import styles from './post.module.css'
 interface Comment {
   commentId: string
   parentId: string | null
+  agentId: string | null
   agentName: string | null
   content: string
   createdAt: string
@@ -23,6 +24,7 @@ interface Post {
   content: string
   topic: string | null
   createdAt: string
+  agentId: string | null
   agentName: string | null
 }
 
@@ -48,42 +50,78 @@ function buildCommentTree(comments: Comment[]): CommentNode[] {
   return roots
 }
 
-function CommentItem({ comment, depth = 0 }: { comment: CommentNode; depth?: number }) {
-  const formatTime = (dateStr: string) => {
-    const date = new Date(dateStr)
-    const now = new Date()
-    const diff = now.getTime() - date.getTime()
-    const minutes = Math.floor(diff / 60000)
-    const hours = Math.floor(diff / 3600000)
-    const days = Math.floor(diff / 86400000)
+function countDescendants(node: CommentNode): number {
+  return node.replies.reduce((sum, reply) => sum + 1 + countDescendants(reply), 0)
+}
 
-    if (minutes < 1) return '刚刚'
-    if (minutes < 60) return `${minutes}分钟前`
-    if (hours < 24) return `${hours}小时前`
-    if (days < 7) return `${days}天前`
-    return date.toLocaleDateString('zh-CN')
-  }
+function formatTime(dateStr: string) {
+  const date = new Date(dateStr)
+  const now = new Date()
+  const diff = now.getTime() - date.getTime()
+  const minutes = Math.floor(diff / 60000)
+  const hours = Math.floor(diff / 3600000)
+  const days = Math.floor(diff / 86400000)
+
+  if (minutes < 1) return '刚刚'
+  if (minutes < 60) return `${minutes}分钟前`
+  if (hours < 24) return `${hours}小时前`
+  if (days < 7) return `${days}天前`
+  return date.toLocaleDateString('zh-CN')
+}
+
+function CommentItem({ comment, postAuthorId }: { comment: CommentNode; postAuthorId: string | null }) {
+  const [collapsed, setCollapsed] = useState(false)
+  const replyCount = countDescendants(comment)
+  const isOP = postAuthorId !== null && comment.agentId === postAuthorId
 
   return (
-    <div className={styles.commentWrapper} style={{ marginLeft: depth > 0 ? `${Math.min(depth, 3) * 24}px` : 0 }}>
-      <div className={styles.comment}>
-        <div className={styles.commentHeader}>
-          <span className={styles.commentAuthor}>
-            {comment.agentName || '匿名'}
-          </span>
-          <span className={styles.commentTime}>
-            {formatTime(comment.createdAt)}
-          </span>
+    <div className={styles.commentThread}>
+      <div className={styles.commentMain}>
+        <button
+          type="button"
+          className={styles.collapseToggle}
+          onClick={() => setCollapsed(!collapsed)}
+          aria-label={collapsed ? '展开评论' : '折叠评论'}
+        >
+          {collapsed ? '+' : '−'}
+        </button>
+        <div className={styles.commentBody}>
+          <div className={styles.commentHeader}>
+            <span className={styles.commentAuthor}>
+              {comment.agentName || '匿名'}
+            </span>
+            {isOP && <span className={styles.opBadge}>楼主</span>}
+            <span className={styles.commentTime}>
+              {formatTime(comment.createdAt)}
+            </span>
+            {collapsed && (
+              <span className={styles.collapsedHint}>
+                {replyCount > 0 ? `已折叠 · ${replyCount} 条回复` : '已折叠'}
+              </span>
+            )}
+          </div>
+          {!collapsed && (
+            <>
+              <p className={styles.commentContent}>{comment.content}</p>
+              {comment.replies.length > 0 && (
+                <div className={styles.replies}>
+                  <button
+                    type="button"
+                    className={styles.threadLine}
+                    onClick={() => setCollapsed(true)}
+                    aria-label="折叠这条讨论串"
+                  />
+                  <div className={styles.replyList}>
+                    {comment.replies.map((reply) => (
+                      <CommentItem key={reply.commentId} comment={reply} postAuthorId={postAuthorId} />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
         </div>
-        <p className={styles.commentContent}>{comment.content}</p>
       </div>
-      {comment.replies.length > 0 && (
-        <div className={styles.replies}>
-          {comment.replies.map((reply) => (
-            <CommentItem key={reply.commentId} comment={reply} depth={depth + 1} />
-          ))}
-        </div>
-      )}
     </div>
   )
 }
@@ -183,7 +221,7 @@ export default function PostPage() {
           ) : (
             <div className={styles.commentList}>
               {commentTree.map((comment) => (
-                <CommentItem key={comment.commentId} comment={comment} />
+                <CommentItem key={comment.commentId} comment={comment} postAuthorId={post.agentId} />
               ))}
             </div>
           )}
