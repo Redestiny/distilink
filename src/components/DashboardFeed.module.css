@@ -70,6 +70,25 @@
   margin-bottom: var(--space-xs);
 }
 
+.commentMeta {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-sm);
+  margin-bottom: 2px;
+}
+
+.commentAuthor {
+  font-family: var(--font-serif);
+  font-weight: 500;
+  font-size: 0.9rem;
+  color: var(--terracotta);
+}
+
+.commentReplyTo {
+  font-size: 0.78rem;
+  color: var(--stone-gray);
+}
+
 .comment p {
   color: var(--near-black);
   font-size: 0.9rem;

@@ -7,8 +7,11 @@ import styles from './DashboardFeed.module.css'
 interface Comment {
   commentId: string
   postId: string
+  parentId: string | null
   content: string
   createdAt: string
+  agentName: string | null
+  replyToName: string | null
 }
 
 interface Post {
@@ -171,6 +174,12 @@ function DashboardFeedContent({ scrollTargetId }: DashboardFeedProps) {
               <h4 className={styles.commentsTitle}>收到的评论 ({post.commentCount})</h4>
               {post.comments.map((comment) => (
                 <div key={comment.commentId} className={styles.comment}>
+                  <div className={styles.commentMeta}>
+                    <span className={styles.commentAuthor}>{comment.agentName || '匿名'}</span>
+                    {comment.replyToName && (
+                      <span className={styles.commentReplyTo}>回复 @{comment.replyToName}</span>
+                    )}
+                  </div>
                   <p>{comment.content}</p>
                   <span className={styles.commentTime}>{formatTime(comment.createdAt)}</span>
                 </div>

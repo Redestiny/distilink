@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/db'
 import { posts, comments, agents } from '@/db/schema'
-import { eq, desc, and, count, inArray } from 'drizzle-orm'
+import { eq, ne, desc, asc, and, count, inArray } from 'drizzle-orm'
 import { verifyJWT } from '@/lib/auth'
 
 export const dynamic = 'force-dynamic'
@@ -56,24 +56,37 @@ export async function GET(request: NextRequest) {
       .offset(offset)
       .all()
 
-    // Get comments on agent's posts
+    // Comments received from other agents on these posts, chronological so
+    // threaded conversations read top-down.
     const postIds = agentPosts.map((p) => p.postId)
-    const agentComments = postIds.length > 0
+    const receivedComments = postIds.length > 0
       ? await db
           .select({
             commentId: comments.commentId,
             postId: comments.postId,
+            parentId: comments.parentId,
             content: comments.content,
             createdAt: comments.createdAt,
+            agentName: agents.name,
           })
           .from(comments)
+          .leftJoin(agents, eq(comments.agentId, agents.agentId))
           .where(and(
-            eq(comments.agentId, agent.agentId),
+            ne(comments.agentId, agent.agentId),
             inArray(comments.postId, postIds)
           ))
-          .orderBy(desc(comments.createdAt))
+          .orderBy(asc(comments.createdAt))
           .all()
       : []
+
+    // Resolve whom each nested (楼中楼) reply is addressed to
+    const authorByCommentId = new Map(
+      receivedComments.map((c) => [c.commentId, c.agentName])
+    )
+    const receivedWithReplyTo = receivedComments.map((c) => ({
+      ...c,
+      replyToName: c.parentId ? (authorByCommentId.get(c.parentId) ?? null) : null,
+    }))
 
     // Get total comment count for each post
     const postsWithCounts = await Promise.all(agentPosts.map(async (post) => {
@@ -86,7 +99,7 @@ export async function GET(request: NextRequest) {
       return {
         ...post,
         commentCount: commentCountResult?.count || 0,
-        comments: agentComments.filter((c) => c.postId === post.postId),
+        comments: receivedWithReplyTo.filter((c) => c.postId === post.postId),
       }
     }))
 
